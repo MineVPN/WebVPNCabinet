@@ -29,11 +29,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["config_file"])) {
     shell_exec('rm /etc/openvpn/*.conf');
     shell_exec('rm /etc/wireguard/*.conf');
     
-
     // Путь для сохранения файла
     $upload_dir = '/etc/openvpn/';
-    $config_file_ovpn = $upload_dir . basename($_FILES["config_file"]["name"]);
+    $config_file_ovpn = $upload_dir . "tun0.conf"; // Имя файла задано явно
     $config_file_conf = $upload_dir . pathinfo($config_file_ovpn, PATHINFO_FILENAME) . ".conf";
+
 
     // Перемещаем загруженный файл в нужную директорию
     if (move_uploaded_file($_FILES["config_file"]["tmp_name"], $config_file_ovpn)) {
