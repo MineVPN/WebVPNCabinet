@@ -94,7 +94,11 @@ if (!array_key_exists($menu_item, $menu_pages)) {
 
         <?php
         // Подключаем выбранную страницу из меню
+        
+        include_once 'get_ip.php';
+        echo "<br>";
         include_once $menu_pages[$menu_item];
+
         ?>
         
         
