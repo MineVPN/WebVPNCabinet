@@ -40,44 +40,24 @@ if (!array_key_exists($menu_item, $menu_pages)) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="favicon.png">
     <title>SERVER</title>
-    <style>
-        /* Стили для бокового меню */
-        .sidebar {
-            width: 200px;
-            height: 100%;
-            position: fixed;
-            top: 0;
-            left: 0;
-            background-color: #f4f4f4;
-            padding-top: 10px;
+    <link rel="stylesheet" href="styles.css">
+    <script>
+    function Notice(text) {
+        // Находим все элементы с классом 'block'
+        var elements = document.querySelectorAll('.notice');
 
-        }
+        // Перебираем найденные элементы
+        elements.forEach(function(element) {
+            // Изменяем текстовое содержимое элемента
+            element.textContent = text;
 
-        .menu-item {
-            padding: 10px 20px;
-            border-bottom: 1px solid #ddd;
-            text-decoration: none;
-            color: #333;
-            display: block;
-        }
-
-        .menu-item:hover {
-            background-color: #ddd;
-        }
-
-        .content {
-            margin-left: 200px; /* Чтобы контент не налезал на меню */
-            padding: 20px;
-            
-        }
-
-        .logo{
-            height: 175px;
-            margin: 10px;
-            margin-bottom: 50px;
-        }
-
-    </style>
+            // Удаляем класс 'hidden', чтобы элемент стал видимым
+            if (element.classList.contains('hidden')) {
+                element.classList.remove('hidden');
+            }
+        });
+    }
+</script>
 </head>
 <body>
     <!-- Боковое меню -->
@@ -90,12 +70,13 @@ if (!array_key_exists($menu_item, $menu_pages)) {
     </div>
 
     <!-- Основной контент -->
-    <div class="content">
+    <div class="notice hidden"></div>
+    <div class="page">
 
         <?php
         // Подключаем выбранную страницу из меню
         
-        include_once 'get_ip.php';
+        
         echo "<br>";
         include_once $menu_pages[$menu_item];
 
@@ -103,5 +84,6 @@ if (!array_key_exists($menu_item, $menu_pages)) {
         
         
     </div>
+    
 </body>
 </html>

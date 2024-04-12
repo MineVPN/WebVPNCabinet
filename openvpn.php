@@ -1,4 +1,5 @@
-<?php
+<div class="content">
+    <?php
 session_start(); // Начало сессии
 
 // Проверяем, установлена ли сессия
@@ -41,15 +42,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["config_file"])) {
         if (rename($config_file_ovpn, $config_file_conf)) {
             // Запускаем OpenVPN
 
-            
+
             shell_exec('sudo systemctl stop openvpn');
+            sleep(1);
             $service_name = pathinfo($config_file_conf, PATHINFO_FILENAME);
             shell_exec('sudo systemctl start openvpn@' . $service_name);
 
             // Выводим результат
-            echo "<div style='background-color: #4caf50; color: white; padding: 10px; border-radius: 4px; margin-bottom: 10px;'>
-            OpenVPN конфигурация успешно установлена и готова к работе!
-        </div>";
+            sleep(4);
+            echo "<script>Notice('OpenVPN конфигурация успешно установлена и готова к работе!');</script>";
         } else {
             echo "Ошибка при переименовании файла.";
         }
@@ -57,56 +58,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["config_file"])) {
         echo "Ошибка при загрузке файла.";
     }
 }
+include_once 'get_ip.php';
 ?>
+<br>
 
-    <style>
-        .container {
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-        .container h2 {
-            margin-top: 0;
-        }
-        .container-form {
-            display: flex;
-            flex-direction: column;
-        }
-        .container-form label {
-            margin-bottom: 10px;
-        }
-        .container-form input[type="text"],
-        .container-form input[type="password"],
-        .container-form input[type="file"] {
-            padding: 8px;
-            margin-bottom: 15px;
-            border-radius: 4px;
-            border: 1px solid #ccc;
-            font-size: 16px;
-        }
-        .container-form input[type="submit"] {
-            padding: 10px 20px;
-            background-color: #4caf50;
-            color: #fff;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        .error-message {
-            color: red;
-            margin-top: 10px;
-        }
-    </style>
-    <div class="container">
-        <h2>Установка и запуск OpenVPN</h2>
-        <form method="post" enctype="multipart/form-data" class="container-form">
-            <label for="config_file">Выберите файл конфигурации (только *.ovpn):</label><br>
-            <input type="file" id="config_file" name="config_file" accept=".ovpn"><br><br>
-            <input type="hidden" name="menu" value="openvpn">
-            <input type="submit" value="Установить и запустить">
-        </form>
-    </div>
+<div class="container">
+    <h2>Установка и запуск OpenVPN</h2>
+    <form method="post" enctype="multipart/form-data" class="container-form">
+        <label for="config_file">Выберите файл конфигурации (только *.ovpn):</label><br>
+        <input type="file" id="config_file" name="config_file" accept=".ovpn">
+        <input type="hidden" name="menu" value="openvpn">
+        <input type="submit" class="green-button" value="Установить и запустить">
+    </form>
+</div>
+</div>
 
 

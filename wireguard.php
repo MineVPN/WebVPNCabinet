@@ -1,3 +1,4 @@
+<div class="content">
 <?php
 session_start(); // Начало сессии
 
@@ -37,65 +38,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["config_file"])) {
         sleep(1);
         shell_exec('sudo systemctl enable wg-quick@tun0'); // Включаем автозапуск для WireGuard с файлом конфигурации tun0.conf
         shell_exec('sudo systemctl start wg-quick@tun0'); // Запускаем WireGuard с указанным конфигурационным файлом
-        
+        sleep(4);
         // Выводим результат
-        echo "<div style='background-color: #4caf50; color: white; padding: 10px; border-radius: 4px; margin-bottom: 10px;'>
-            WireGuard конфигурация успешно установлена и готова к работе!
-        </div>";
+        echo "<script>Notice('WireGuard конфигурация успешно установлена и готова к работе!');</script>";
     } else {
         echo "Ошибка при загрузке файла.";
     }
 }
+include_once 'get_ip.php';
 ?>
-
-
-<style>
-    .login-container {
-        background-color: #fff;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    }
-    .login-container h2 {
-        margin-top: 0;
-    }
-    .login-form {
-        display: flex;
-        flex-direction: column;
-    }
-    .login-form label {
-        margin-bottom: 10px;
-    }
-    .login-form input[type="text"],
-    .login-form input[type="password"],
-    .login-form input[type="file"] {
-        padding: 8px;
-        margin-bottom: 15px;
-        border-radius: 4px;
-        border: 1px solid #ccc;
-        font-size: 16px;
-    }
-    .login-form input[type="submit"] {
-        padding: 10px 20px;
-        background-color: #4caf50;
-        color: #fff;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 16px;
-    }
-    .error-message {
-        color: red;
-        margin-top: 10px;
-    }
-</style>
-
-<div class="login-container">
+<br>
+<div class="container">
     <h2>Установка и запуск WireGuard</h2>
-    <form method="post" enctype="multipart/form-data" class="login-form">
+    <form method="post" enctype="multipart/form-data" class="container-form">
         <label for="config_file">Выберите файл конфигурации (только *.conf):</label><br>
-        <input type="file" id="config_file" name="config_file" accept=".conf"><br><br>
+        <input type="file" id="config_file" name="config_file" accept=".conf">
         <input type="hidden" name="menu" value="wireguard">
-        <input type="submit" value="Установить и запустить">
+        <input type="submit" class="green-button" value="Установить и запустить">
     </form>
+</div>
 </div>
