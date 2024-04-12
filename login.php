@@ -15,7 +15,7 @@
                 <input type="text" id="username" name="username" required value='root'>
                 <label for="password">Пароль:</label>
                 <input type="password" id="password" name="password" required>
-                <input type="submit" value="Войти">
+                <input type="submit" class="green-button" value="Войти">
             </form>
             <?php
         // Проверка, была ли отправлена форма
