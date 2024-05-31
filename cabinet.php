@@ -65,7 +65,7 @@ if (!array_key_exists($menu_item, $menu_pages)) {
         <img src="logo.png" class="logo">
         <a class="menu-item" href="cabinet.php?menu=openvpn">OpenVPN</a>
         <a class="menu-item" href="cabinet.php?menu=wireguard">WireGuard</a>
-        <a class="menu-item" href="cabinet.php?menu=ping">Ping</a>
+        <!--a class="menu-item" href="cabinet.php?menu=ping">Ping</a-->
         <a class="menu-item" href="logout.php">Выход</a>
     </div>
 
