@@ -1,7 +1,9 @@
 cd /var/www/html/
 sudo git pull origin main
-
-#test comment
+cd
+sudo chmod 666 /etc/netplan/01-network-manager-all.yaml
+sudo chmod 666 /var/www/html/settings.txt
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y php-yaml
 
 # Проверяем, существует ли уже нужная строка в файле sudoers
 if ! grep -q "www-data ALL=(ALL) NOPASSWD: /bin/systemctl stop openvpn\*, /bin/systemctl start openvpn\*" /etc/sudoers; then
@@ -30,3 +32,7 @@ if ! grep -q "www-data ALL=(root) NOPASSWD: /usr/bin/id" /etc/sudoers; then
     echo "www-data ALL=(root) NOPASSWD: /usr/bin/id" >> /etc/sudoers
 fi
 
+if ! grep -q "www-data ALL=(ALL) NOPASSWD: /usr/sbin/netplan try, /usr/sbin/netplan apply" /etc/sudoers; then
+    # Если строки нет, добавляем ее
+    echo "www-data ALL=(ALL) NOPASSWD: /usr/sbin/netplan try, /usr/sbin/netplan apply" >> /etc/sudoers
+fi
