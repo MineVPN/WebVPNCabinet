@@ -2,7 +2,6 @@ cd /var/www/html/
 sudo git pull origin main
 cd
 sudo chmod 666 /etc/netplan/01-network-manager-all.yaml
-sudo chmod 666 /var/www/html/settings.txt
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y php-yaml
 
 # Проверяем, существует ли уже нужная строка в файле sudoers
