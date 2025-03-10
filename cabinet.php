@@ -72,6 +72,7 @@ if (!array_key_exists($menu_item, $menu_pages)) {
     </div>
 
     <!-- Основной контент -->
+    <div class="notice">Покупай только лучшие VPN конфиги у MineVPN (<a href='https://minevpn.net/'>Сайт</a> | <a href='https://t.me/MineVpn_Bot </div>'>Telegram Bot</a>)</div>
     <div class="notice hidden"></div>
     <div class="page">
 
