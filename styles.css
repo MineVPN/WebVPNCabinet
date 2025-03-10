@@ -200,6 +200,15 @@ input[type="text"], input[type="number"], select{
 
 }
 
+.notice-ads{
+    background-color: #4c75af; 
+    color: white;
+    padding: 10px; 
+    border-radius: 4px; 
+    margin-left: 200px;
+    margin-bottom: 5px;
+}
+
 .hidden {
     display: none; /* CSS класс для скрытия элемента */
 }
