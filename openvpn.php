@@ -64,7 +64,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     shell_exec('sudo systemctl daemon-reload');
                     shell_exec('sudo systemctl start openvpn@tun0');
                     sleep(4);
-                    echo "<script>Notice('OpenVPN конфигурация успешно установлена и готова к работе!'); window.setTimeout(() => window.location = 'cabinet.php?menu=openvpn', 2000);</script>";
+                    echo "<script>Notice('OpenVPN конфигурация успешно установлена и готова к работе!');</script>";
+                    echo "<script>window.location = 'cabinet.php?menu=openvpn';</script>";
                 } else {
                     echo "<script>Notice('Ошибка при загрузке файла.');</script>";
                 }

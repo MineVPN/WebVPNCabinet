@@ -70,7 +70,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     shell_exec('sudo systemctl enable wg-quick@tun0');
                     shell_exec('sudo systemctl start wg-quick@tun0');
                     sleep(4);
-                    echo "<script>Notice('WireGuard конфигурация успешно установлена!', 'success'); window.setTimeout(() => window.location = 'cabinet.php?menu=wireguard', 2000);</script>";
+                    echo "<script>Notice('WireGuard конфигурация успешно установлена!', 'success');</script>";
+                    echo "<script>window.location = 'cabinet.php?menu=wireguard';</script>";
                 } else {
                     echo "<script>Notice('Ошибка при загрузке файла.', 'error');</script>";
                 }
