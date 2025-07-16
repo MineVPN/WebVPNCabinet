@@ -1,13 +1,3 @@
-<?php
-session_start();
-
-if (!isset($_SESSION["authenticated"]) || $_SESSION["authenticated"] !== true) {
-    header("Location: login.php");
-    exit();
-}
-
-?>
-
 <div class="container">
     <?php
     $openvpn_config_path = '/etc/openvpn/tun0.conf';
