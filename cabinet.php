@@ -1,23 +1,18 @@
 <?php
-session_start(); // Начало сессии
+// ----- ВСЯ ТВОЯ PHP-ЛОГИКА ОСТАЕТСЯ ЗДЕСЬ БЕЗ ИЗМЕНЕНИЙ -----
+session_start();
 
-// Проверяем, установлена ли сессия
 if (!isset($_SESSION["authenticated"]) || $_SESSION["authenticated"] !== true) {
-    // Сессия не установлена или пользователь не аутентифицирован, перенаправляем на страницу входа
     header("Location: login.php");
-    exit(); // Важно вызвать exit() после перенаправления, чтобы предотвратить дальнейшее выполнение кода
+    exit();
 }
 
 if(isset($_POST['menu'])){
     $_GET['menu'] = $_POST['menu'];
 }
 
-// Проверяем, был ли передан параметр меню
-$menu_item = isset($_GET['menu']) ? $_GET['menu'] : 'openvpn'; // По умолчанию открывается страница OpenVPN
+$menu_item = isset($_GET['menu']) ? $_GET['menu'] : 'openvpn';
 
-
-
-// Пути к страницам меню
 $menu_pages = [
     'openvpn' => 'openvpn.php',
     'wireguard' => 'wireguard.php',
@@ -25,15 +20,10 @@ $menu_pages = [
     'settings' => 'settings.php'
 ];
 
-// Проверяем, существует ли запрошенная страница в меню
 if (!array_key_exists($menu_item, $menu_pages)) {
-    // Если страница не найдена, перенаправляем на страницу OpenVPN
     $menu_item = 'openvpn';
 }
-
-// Весь ваш код для страницы кабинета может быть добавлен здесь
 ?>
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -41,49 +31,79 @@ if (!array_key_exists($menu_item, $menu_pages)) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="favicon.png">
     <title>SERVER</title>
-    <link rel="stylesheet" href="styles.css">
+    <script src="tailwindcss.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0F172A; }
+        .glassmorphism { 
+            background: rgba(30, 41, 59, 0.6); /* bg-slate-800 с прозрачностью */
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+
     <script>
     function Notice(text) {
-        // Находим все элементы с классом 'block'
         var elements = document.querySelectorAll('.notice');
-
-        // Перебираем найденные элементы
         elements.forEach(function(element) {
-            // Изменяем текстовое содержимое элемента
             element.textContent = text;
-
-            // Удаляем класс 'hidden', чтобы элемент стал видимым
             if (element.classList.contains('hidden')) {
                 element.classList.remove('hidden');
             }
         });
     }
-</script>
+    </script>
 </head>
-<body>
-    <!-- Боковое меню -->
-    <div class="sidebar">
-        <img src="logo.png" class="logo">
-        <a class="menu-item" href="cabinet.php?menu=openvpn">OpenVPN</a>
-        <a class="menu-item" href="cabinet.php?menu=wireguard">WireGuard</a>
-        <a class="menu-item" href="cabinet.php?menu=ping">Ping</a>
-        <a class="menu-item" href="cabinet.php?menu=settings">Настройки</a>
-        <a class="menu-item" href="logout.php">Выход</a>
+<body class="text-slate-300">
+
+    <div class="flex min-h-screen">
+        <aside class="w-64 flex-shrink-0 bg-slate-900 p-4 flex flex-col border-r border-slate-800">
+            <a href="cabinet.php" class="p-4 mb-6 text-center block">
+                <img src="logo.png" alt="Logo" class="w-48 h-48 mx-auto transition-all">
+            </a>
+
+            <nav class="flex flex-col gap-2">
+                <a href="cabinet.php?menu=openvpn" class="flex items-center gap-4 px-4 py-3 rounded-lg transition-colors 
+                    <?php echo ($menu_item == 'openvpn') ? 'bg-violet-500/20 text-white shadow-inner' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'; ?>">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                    <span class="font-medium">OpenVPN</span>
+                </a>
+                <a href="cabinet.php?menu=wireguard" class="flex items-center gap-4 px-4 py-3 rounded-lg transition-colors
+                    <?php echo ($menu_item == 'wireguard') ? 'bg-violet-500/20 text-white shadow-inner' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'; ?>">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                    <span class="font-medium">WireGuard</span>
+                </a>
+                <a href="cabinet.php?menu=ping" class="flex items-center gap-4 px-4 py-3 rounded-lg transition-colors
+                    <?php echo ($menu_item == 'ping') ? 'bg-violet-500/20 text-white shadow-inner' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'; ?>">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    <span class="font-medium">Ping</span>
+                </a>
+                <a href="cabinet.php?menu=settings" class="flex items-center gap-4 px-4 py-3 rounded-lg transition-colors
+                    <?php echo ($menu_item == 'settings') ? 'bg-violet-500/20 text-white shadow-inner' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'; ?>">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    <span class="font-medium">Настройки</span>
+                </a>
+                <a href="logout.php" class="flex items-center gap-4 px-4 py-3 rounded-lg text-slate-400 hover:bg-red-500/20 hover:text-red-400 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                    <span class="font-medium">Выход</span>
+                </a>
+            </nav>
+
+        </aside>
+
+        <main class="flex-grow p-4 sm:p-8 w-full">
+            
+
+            <div class="glassmorphism rounded-2xl p-6 sm:p-8 h-full">
+                <div class="bg-sky-500/20 text-sky-300 p-4 rounded-xl border border-sky-500/30 mb-6 text-center">
+                Покупай только лучшие VPN конфиги у MineVPN (<a href='https://minevpn.net/' target="_blank" class="font-bold hover:underline">Сайт</a> | <a href='https://t.me/MineVpn_Bot' target="_blank" class="font-bold hover:underline">Telegram Bot</a>)
+            </div>
+                <div class="notice hidden bg-green-500/20 text-green-300 p-4 rounded-xl border border-green-500/30 mb-6"></div>
+                <?php
+                include_once $menu_pages[$menu_item];
+                ?>
+            </div>
+        </main>
     </div>
-
-    <!-- Основной контент -->
-    <div class="notice-ads">Покупай только лучшие VPN конфиги у MineVPN (<a href='https://minevpn.net/' target="_blank">Сайт</a> | <a href='https://t.me/MineVpn_Bot' target="_blank">Telegram Bot</a>)</div>
-    <div class="notice hidden"></div>
-    <div class="page">
-
-        <?php
-        // Подключаем выбранную страницу из меню
-        include_once $menu_pages[$menu_item];
-
-        ?>
-        
-        
-    </div>
-    
 </body>
 </html>
