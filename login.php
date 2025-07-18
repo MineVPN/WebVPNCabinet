@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="favicon.png">
     <title>SERVER Login</title>
     <script src="tailwindcss.js"></script>
     <style>
@@ -15,12 +16,14 @@
 
     <div class="min-h-screen flex items-center justify-center p-4">
         <div class="w-full max-w-md glassmorphism rounded-2xl p-8">
-            <h2 class="text-3xl font-bold text-white mb-6 text-center">Вход</h2>
             
             <form class="space-y-6" action="login.php" method="POST">
                 <div>
+                    <img src="logo.png" alt="Server Logo" class="w-48 h-48 mx-auto mb-4">
+                </div>
+                <div>
                     <label for="username" class="block mb-2 text-sm font-medium text-slate-400">Пользователь:</label>
-                    <input type="text" id="username" name="username" required value="root" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg p-3 text-white placeholder-slate-400 focus:ring-2 focus:ring-violet-500 focus:outline-none transition">
+                    <input disabled type="text" id="username" name="username" required value="root" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg p-3 text-white placeholder-slate-400 focus:ring-2 focus:ring-violet-500 focus:outline-none transition">
                 </div>
                 <div>
                     <label for="password" class="block mb-2 text-sm font-medium text-slate-400">Пароль:</label>
