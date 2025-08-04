@@ -53,7 +53,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
             if (in_array($file_extension, $allowed_extensions)) {
                 shell_exec('sudo systemctl stop wg-quick@tun0');
-                shell_exec('systemctl disable wg-quick@tun0');
+                //shell_exec('systemctl disable wg-quick@tun0');
                 shell_exec('sudo systemctl stop openvpn@tun0');
                 shell_exec('rm /etc/openvpn/*.conf');
                 shell_exec('rm /etc/wireguard/*.conf');
@@ -169,4 +169,5 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 
 </script>
+
 
