@@ -62,7 +62,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 
                 if (move_uploaded_file($_FILES["config_file"]["tmp_name"], $config_file_ovpn)) {
                     shell_exec('sudo systemctl daemon-reload');
-                    shell_exec('sudo systemctl start openvpn@tun0');
+                    shell_exec('sudo systemctl restart openvpn@tun0');
                     sleep(4);
                     echo "<script>Notice('OpenVPN конфигурация успешно установлена и готова к работе!');</script>";
                     echo "<script>window.location = 'cabinet.php?menu=openvpn';</script>";
@@ -165,5 +165,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             dropZoneText.innerHTML = `<span class="font-semibold text-green-400">Файл выбран:</span> ${fileInput.files[0].name}`;
         }
     });
+
 
 </script>
