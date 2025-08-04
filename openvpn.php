@@ -54,6 +54,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             if (in_array($file_extension, $allowed_extensions)) {
                 shell_exec('sudo systemctl stop wg-quick@tun0');
                 shell_exec('systemctl disable wg-quick@tun0');
+                shell_exec('sudo systemctl stop openvpn@tun0');
                 shell_exec('rm /etc/openvpn/*.conf');
                 shell_exec('rm /etc/wireguard/*.conf');
 
@@ -62,7 +63,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 
                 if (move_uploaded_file($_FILES["config_file"]["tmp_name"], $config_file_ovpn)) {
                     shell_exec('sudo systemctl daemon-reload');
-                    shell_exec('sudo systemctl restart openvpn@tun0');
+                    shell_exec('sudo systemctl start openvpn@tun0');
                     sleep(4);
                     echo "<script>Notice('OpenVPN конфигурация успешно установлена и готова к работе!');</script>";
                     echo "<script>window.location = 'cabinet.php?menu=openvpn';</script>";
@@ -168,3 +169,4 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 
 </script>
+
