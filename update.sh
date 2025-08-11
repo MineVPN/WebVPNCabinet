@@ -35,3 +35,21 @@ if ! grep -q "www-data ALL=(ALL) NOPASSWD: /usr/sbin/netplan try, /usr/sbin/netp
     # Если строки нет, добавляем ее
     echo "www-data ALL=(ALL) NOPASSWD: /usr/sbin/netplan try, /usr/sbin/netplan apply" >> /etc/sudoers
 fi
+
+# Определяем правило, которое нужно проверить/добавить
+IPTABLES_RULE="-A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu"
+
+# Проверяем, существует ли уже это правило в цепочке FORWARD
+if ! sudo iptables -C $IPTABLES_RULE &> /dev/null; then
+    # Если команда проверки завершилась с ошибкой (код не 0), значит, правила нет.
+    echo "Правило MSS clamp не найдено. Добавляю..."
+    sudo iptables $IPTABLES_RULE
+    
+    # После добавления правила, сохраняем текущую конфигурацию iptables,
+    # чтобы правило пережило перезагрузку.
+    echo "Сохраняю правила iptables..."
+    sudo iptables-save | sudo tee /etc/iptables/rules.v4
+else
+    # Если команда проверки завершилась успешно (код 0), значит, правило уже есть.
+    echo "Правило MSS clamp уже существует. Ничего не делаю."
+fi
