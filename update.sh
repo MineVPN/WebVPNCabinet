@@ -36,20 +36,19 @@ if ! grep -q "www-data ALL=(ALL) NOPASSWD: /usr/sbin/netplan try, /usr/sbin/netp
     echo "www-data ALL=(ALL) NOPASSWD: /usr/sbin/netplan try, /usr/sbin/netplan apply" >> /etc/sudoers
 fi
 
-# Определяем правило, которое нужно проверить/добавить
-IPTABLES_RULE="-A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu"
+# Определяем только параметры правила, БЕЗ флага -A (добавить)
+RULE_PARAMS="FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu"
 
-# Проверяем, существует ли уже это правило в цепочке FORWARD
-if ! sudo iptables -C $IPTABLES_RULE &> /dev/null; then
-    # Если команда проверки завершилась с ошибкой (код не 0), значит, правила нет.
+# Проверяем наличие правила, используя только его параметры
+if ! sudo iptables -C $RULE_PARAMS &> /dev/null; then
+    # Правила нет, поэтому теперь мы используем флаг -A для его ДОБАВЛЕНИЯ
     echo "Правило MSS clamp не найдено. Добавляю..."
-    sudo iptables $IPTABLES_RULE
+    sudo iptables -A $RULE_PARAMS
     
-    # После добавления правила, сохраняем текущую конфигурацию iptables,
-    # чтобы правило пережило перезагрузку.
+    # Сохраняем конфигурацию, чтобы правило пережило перезагрузку
     echo "Сохраняю правила iptables..."
-    sudo iptables-save | sudo tee /etc/iptables/rules.v4
+    sudo iptables-save | sudo tee /etc/iptables/rules.v4 > /dev/null
 else
-    # Если команда проверки завершилась успешно (код 0), значит, правило уже есть.
+    # Правило уже есть, ничего не делаем
     echo "Правило MSS clamp уже существует. Ничего не делаю."
 fi
