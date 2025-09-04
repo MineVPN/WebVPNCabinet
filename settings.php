@@ -25,7 +25,7 @@ $settingNames = [
 // ===================================================================
 
 // Имя файла с настройками
-$settingsFile = 'settings';
+$settingsFile = '../settings';
 
 // --- Функции readSimpleSettings и writeSimpleSettings остаются без изменений ---
 
