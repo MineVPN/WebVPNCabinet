@@ -248,6 +248,11 @@ EOF
     systemctl stop vpn-healthcheck.timer >/dev/null 2>&1
     systemctl enable --now vpn-healthcheck.timer
 
+cat > /var/www/settings << EOF
+vpnchecker=true
+autoupvpn=true
+EOF
+
     # --- Финальное сообщение ---
     echo ""
     echo "🎉 Готово! Установка универсальной службы проверки VPN завершены."
