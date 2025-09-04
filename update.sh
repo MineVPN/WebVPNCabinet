@@ -11,6 +11,8 @@ sudo git pull origin main
 cd
 echo "Репозиторий обновлен."
 
+chmod 777 /var/www/html/settings
+
 
 # --- Путь к файлу, где хранится текущая версия на сервере ---
 VERSION_FILE="/var/www/version"
@@ -107,6 +109,11 @@ EOF
         echo "   Обновляю crontab..."
         (crontab -l 2>/dev/null | grep -v "$OLD_CRON_COMMAND"; echo "$CRON_JOB") | crontab -
         echo "   Переход успешно выполнен!"
+    fi
+
+    if [ "$CURRENT_VERSION" -lt 3 ]; then
+        chmod 777 /var/www/html/settings
+
     fi
 
 
