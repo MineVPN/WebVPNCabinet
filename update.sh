@@ -124,7 +124,7 @@ cat > /usr/local/bin/vpn-healthcheck.sh << 'EOF'
 
 # --- Конфигурация ---
 INTERFACE="tun0"
-SETTINGS_FILE="/var/www/html/settings"
+SETTINGS_FILE="/var/www/settings"
 IP_CHECK_SERVICE="ifconfig.me"
 
 # --- Функции ---
