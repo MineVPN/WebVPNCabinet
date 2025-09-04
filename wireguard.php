@@ -139,7 +139,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     </div>
 
     <div class="glassmorphism rounded-2xl p-6 flex flex-col">
-        <h2 class="text-2xl font-bold text-white mb-6">Установка конфигурации</h2>
+        <h2 class="text-2xl font-bold text-white mb-6">Установка конфигурации WireGuard</h2>
         <form id="upload-form" method="post" enctype="multipart/form-data" class="flex flex-col flex-grow">
             <div class="flex-grow">
                 <label id="drop-zone" for="config_file" class="flex flex-col items-center justify-center w-full h-full border-2 border-dashed border-slate-600 rounded-xl cursor-pointer hover:border-violet-500 transition-colors">
@@ -285,4 +285,5 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 });
         });
     }
+
 </script>
