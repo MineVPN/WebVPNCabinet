@@ -87,7 +87,9 @@ if [ "$CURRENT_VERSION" -lt "$SCRIPT_VERSION" ]; then
 #!/bin/bash
 cd /var/www/html/ || exit
 echo "Обновляем ЛК..."
-sudo git pull origin main
+sudo git fetch origin
+sudo git reset --hard origin/main
+sudo git clean -df
 sudo chmod +x /var/www/html/update.sh
 echo "Запускаем скрипт обновления update.sh..."
 /var/www/html/update.sh
