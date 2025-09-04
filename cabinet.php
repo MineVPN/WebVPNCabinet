@@ -11,23 +11,30 @@ if(isset($_POST['menu'])){
     $_GET['menu'] = $_POST['menu'];
 }
 
-// ИЗМЕНЕНИЕ: Умное определение страницы по умолчанию при входе
+// ИЗМЕНЕНИЕ: Логика определения страницы по умолчанию остаётся
 if (isset($_GET['menu'])) {
-    // Если пункт меню задан в URL, используем его
     $menu_item = $_GET['menu'];
 } else {
-    // Если не задан (первый вход после логина), определяем по конфигу
     $wireguard_config_path = '/etc/wireguard/tun0.conf';
     $openvpn_config_path = '/etc/openvpn/tun0.conf';
 
     if (file_exists($wireguard_config_path)) {
-        $menu_item = 'wireguard'; // По умолчанию WireGuard, если есть конфиг
+        $menu_item = 'wireguard';
     } elseif (file_exists($openvpn_config_path)) {
-        $menu_item = 'openvpn'; // Иначе OpenVPN, если есть конфиг
+        $menu_item = 'openvpn';
     } else {
-        $menu_item = 'openvpn'; // Запасной вариант по умолчанию
+        $menu_item = 'openvpn';
     }
 }
+
+// ИЗМЕНЕНИЕ: Добавляем отдельное определение активного типа VPN для меню
+$active_vpn_type = null;
+if (file_exists('/etc/wireguard/tun0.conf')) {
+    $active_vpn_type = 'wireguard';
+} elseif (file_exists('/etc/openvpn/tun0.conf')) {
+    $active_vpn_type = 'openvpn';
+}
+
 
 $menu_pages = [
     'openvpn' => 'openvpn.php',
@@ -38,7 +45,7 @@ $menu_pages = [
 ];
 
 if (!array_key_exists($menu_item, $menu_pages)) {
-    $menu_item = 'openvpn'; // Защита от неверного параметра
+    $menu_item = 'openvpn';
 }
 ?>
 <!DOCTYPE html>
@@ -57,14 +64,11 @@ if (!array_key_exists($menu_item, $menu_pages)) {
         backdrop-filter: blur(16px);
         border: 1px solid rgba(255, 255, 255, 0.1);
     }
-
-    /* Стили для скроллбара */
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: #1e293b; }
     ::-webkit-scrollbar-thumb { background-color: #475569; border-radius: 10px; border: 2px solid #1e293b; }
     ::-webkit-scrollbar-thumb:hover { background-color: #64748b; }
     * { scrollbar-width: thin; scrollbar-color: #475569 #1e293b; }
-
     </style>
 
     <script>
@@ -77,6 +81,44 @@ if (!array_key_exists($menu_item, $menu_pages)) {
             }
         });
     }
+
+    // ИЗМЕНЕНИЕ: Добавлена функция обновления пинга в боковом меню
+    function updateSidebarPing() {
+        const pingElement = document.getElementById('sidebar-ping-display');
+        // Если элемента нет на странице (например, на странице настроек), ничего не делаем
+        if (!pingElement) {
+            return;
+        }
+
+        const xhr = new XMLHttpRequest();
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState == 4 && xhr.status == 200) {
+                pingElement.classList.remove('hidden');
+                const response = xhr.responseText;
+                pingElement.classList.remove('text-green-300', 'text-orange-300', 'text-red-300');
+
+                if (response.indexOf("NO PING") == -1) {
+                    const pingValue = Math.round(parseFloat(response));
+                    pingElement.textContent = `${pingValue}мс`;
+                    if (pingValue < 100) pingElement.classList.add('text-green-300');
+                    else if (pingValue < 200) pingElement.classList.add('text-orange-300');
+                    else pingElement.classList.add('text-red-300');
+                } else {
+                    pingElement.textContent = 'X';
+                    pingElement.classList.add('text-red-300');
+                }
+            }
+        };
+        // Пингуем через tun0, так как это общий интерфейс для обоих VPN
+        xhr.open("GET", "ping.php?host=8.8.8.8&interface=tun0", true);
+        xhr.send();
+    }
+    
+    // Запускаем обновление при загрузке и по интервалу
+    document.addEventListener('DOMContentLoaded', () => {
+        updateSidebarPing();
+        setInterval(updateSidebarPing, 3000); // Обновляем каждые 5 секунд
+    });
     </script>
 </head>
 <body class="text-slate-300">
@@ -92,11 +134,17 @@ if (!array_key_exists($menu_item, $menu_pages)) {
                     <?php echo ($menu_item == 'openvpn') ? 'bg-violet-500/20 text-white shadow-inner' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'; ?>">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                     <span class="font-medium">OpenVPN</span>
+                    <?php if ($active_vpn_type == 'openvpn'): ?>
+                        <span id="sidebar-ping-display" class="ml-auto text-xs font-mono bg-slate-700 px-2 py-0.5 rounded-full">--</span>
+                    <?php endif; ?>
                 </a>
                 <a href="cabinet.php?menu=wireguard" class="flex items-center gap-4 px-4 py-3 rounded-lg transition-colors
                     <?php echo ($menu_item == 'wireguard') ? 'bg-violet-500/20 text-white shadow-inner' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'; ?>">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
                     <span class="font-medium">WireGuard</span>
+                    <?php if ($active_vpn_type == 'wireguard'): ?>
+                        <span id="sidebar-ping-display" class="ml-auto text-xs font-mono bg-slate-700 px-2 py-0.5 rounded-full">--</span>
+                    <?php endif; ?>
                 </a>
                 <a href="cabinet.php?menu=ping" class="flex items-center gap-4 px-4 py-3 rounded-lg transition-colors
                     <?php echo ($menu_item == 'ping') ? 'bg-violet-500/20 text-white shadow-inner' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'; ?>">
