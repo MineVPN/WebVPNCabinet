@@ -7,25 +7,6 @@ if (!isset($_SESSION["authenticated"]) || $_SESSION["authenticated"] !== true) {
     exit();
 }
 ?>
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Утилита Ping</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* Стили для эффекта "glassmorphism" */
-        .glassmorphism {
-            background: rgba(30, 41, 59, 0.5); /* bg-slate-800 with 50% opacity */
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-    </style>
-</head>
-<body class="bg-slate-900 text-slate-200 min-h-screen p-4 sm:p-8">
-
     <div class="mx-auto">
 
         <div class="flex flex-col gap-8">
@@ -213,6 +194,4 @@ if (!isset($_SESSION["authenticated"]) || $_SESSION["authenticated"] !== true) {
     }
 </script>
 
-</body>
-</html>
 
