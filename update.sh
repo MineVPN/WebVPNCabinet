@@ -214,7 +214,7 @@ Description=Run VPN Health Check Service periodically
 
 [Timer]
 OnBootSec=1min
-OnUnitActiveSec=30s
+OnUnitActiveSec=15s
 Unit=vpn-healthcheck.service
 
 [Install]
