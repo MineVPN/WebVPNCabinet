@@ -1,7 +1,10 @@
 <?php
-// Мы не начинаем сессию здесь заново, так как она уже запущена в cabinet.php
-
-// --- ЛОГИКА СТАТУСА (аналогично OpenVPN, но с акцентом на WireGuard) ---
+// Проверка аутентификации
+if (!isset($_SESSION["authenticated"]) || $_SESSION["authenticated"] !== true) {
+    header("Location: login.php");
+    exit();
+}
+// --- ЛОГИКА СТАТУСА ---
 $openvpn_config_path = '/etc/openvpn/tun0.conf';
 $wireguard_config_path = '/etc/wireguard/tun0.conf';
 $type = null;
@@ -34,24 +37,29 @@ if (strpos($status_output, 'Device not found') === false) {
     $connection_status = 'connected';
 }
 
-// --- ЛОГИКА ОБРАБОТКИ ФОРМ (start/stop/upload) ---
+// Проверяем статус автозапуска
+$settings_file_path = '../settings';
+$autostart_status_text = 'Выключен'; // Значение по умолчанию
+if (file_exists($settings_file_path) && is_readable($settings_file_path)) {
+    $settings_content = file_get_contents($settings_file_path);
+    if (strpos($settings_content, 'autoupvpn=true') !== false) {
+        $autostart_status_text = 'Включен';
+    }
+}
 
+
+// --- ЛОГИКА ОБРАБОТКИ ФОРМ (start/stop/upload) ---
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    // Обработка кнопок Start/Stop
     if (isset($_POST['wireguard_start'])) {
         shell_exec("sudo systemctl start wg-quick@tun0");
         sleep(5);
-        echo "<script>window.location = 'cabinet.php?menu=wireguard';</script>";
         exit();
     }
     if (isset($_POST['wireguard_stop'])) {
         shell_exec("sudo systemctl stop wg-quick@tun0");
         sleep(3);
-        echo "<script>window.location = 'cabinet.php?menu=wireguard';</script>";
         exit();
     }
-
-    // Обработка загрузки файла
     if (isset($_FILES["config_file"])) {
         if (!empty($_FILES["config_file"]["name"])) {
             $allowed_extensions = array('conf');
@@ -93,27 +101,37 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <span class="font-medium">Конфигурация:</span>
                 <span class="text-white font-semibold"><?= htmlspecialchars($config_type) ?></span>
             </div>
-            <div class="flex justify-between">
+            <div class="flex justify-between items-center">
                 <span class="font-medium">IP-адрес:</span>
-                <span class="text-white font-semibold font-mono"><?= htmlspecialchars($ip_address) ?></span>
+                <div class="flex items-center gap-2">
+                    <span class="text-white font-semibold font-mono"><?= htmlspecialchars($ip_address) ?></span>
+                    <span id="ping-display" class="bg-slate-700 text-xs font-mono px-2 py-1 rounded-full hidden transition-colors">--</span>
+                </div>
             </div>
             <div class="flex justify-between items-center">
                 <span class="font-medium">Соединение:</span>
-                <?php if ($connection_status == 'connected'): ?>
-                    <span class="bg-green-500/20 text-green-300 px-3 py-1 rounded-full text-sm font-semibold">Установлено</span>
+                <span id="connection-status-badge">
+                    <?php if ($connection_status == 'connected'): ?>
+                        <span class="bg-green-500/20 text-green-300 px-3 py-1 rounded-full text-sm font-semibold">Установлено</span>
+                    <?php else: ?>
+                        <span class="bg-red-500/20 text-red-300 px-3 py-1 rounded-full text-sm font-semibold">Разорвано</span>
+                    <?php endif; ?>
+                </span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="font-medium">Автозапуск при падении:</span>
+                <?php if ($autostart_status_text == 'Включен'): ?>
+                    <span class="bg-green-500/20 text-green-300 px-3 py-1 rounded-full text-sm font-semibold">Включен</span>
                 <?php else: ?>
-                    <span class="bg-red-500/20 text-red-300 px-3 py-1 rounded-full text-sm font-semibold">Разорвано</span>
+                    <span class="bg-red-500/20 text-red-300 px-3 py-1 rounded-full text-sm font-semibold">Выключен</span>
                 <?php endif; ?>
             </div>
         </div>
-
-        <form method="post" class="mt-8">
+        
+        <form id="vpn-control-form" method="post" class="mt-8">
             <?php if ($type == "wireguard"): ?>
-                <?php if ($connection_status == "disconnected"): ?>
-                    <button type="submit" name="wireguard_start" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition-all">Запустить WireGuard</button>
-                <?php else: ?>
-                    <button type="submit" name="wireguard_stop" class="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-all">Остановить WireGuard</button>
-                <?php endif; ?>
+                <button type="submit" name="wireguard_start" id="wireguard-start-btn" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition-all <?= $connection_status == 'connected' ? 'hidden' : '' ?>">Запустить WireGuard</button>
+                <button type="submit" name="wireguard_stop" id="wireguard-stop-btn" class="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-all <?= $connection_status == 'disconnected' ? 'hidden' : '' ?>">Остановить WireGuard</button>
             <?php else: ?>
                  <button disabled class="w-full bg-slate-700 text-slate-500 font-bold py-3 rounded-lg cursor-not-allowed">Действий нет</button>
             <?php endif; ?>
@@ -146,21 +164,125 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-violet-500'); dropZone.classList.remove('border-slate-600'); });
     dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('border-violet-500'); dropZone.classList.add('border-slate-600'); });
-
     dropZone.addEventListener('drop', (e) => {
         e.preventDefault();
         dropZone.classList.remove('border-violet-500');
-        dropZone.classList.add('border-slate-600');
         const files = e.dataTransfer.files;
         if (files.length > 0) {
             fileInput.files = files;
             dropZoneText.innerHTML = `<span class="font-semibold text-green-400">Файл выбран:</span> ${files[0].name}`;
         }
     });
-    
     fileInput.addEventListener('change', () => {
         if (fileInput.files.length > 0) {
             dropZoneText.innerHTML = `<span class="font-semibold text-green-400">Файл выбран:</span> ${fileInput.files[0].name}`;
         }
     });
+
+    let liveUpdateInterval; // Переменная для хранения ID таймера
+
+    function updateLiveStatus() {
+        // 1. Обновляем Пинг
+        const pingDisplay = document.getElementById('ping-display');
+        const pingXhr = new XMLHttpRequest();
+        pingXhr.onreadystatechange = function() {
+            if (pingXhr.readyState == 4 && pingXhr.status == 200) {
+                pingDisplay.classList.remove('hidden');
+                const response = pingXhr.responseText;
+                pingDisplay.classList.remove('text-green-300', 'text-orange-300', 'text-red-300');
+                if (response.indexOf("NO PING") == -1) {
+                    const pingValue = Math.round(parseFloat(response));
+                    pingDisplay.textContent = `${pingValue}мс`;
+                    if (pingValue < 100) pingDisplay.classList.add('text-green-300');
+                    else if (pingValue < 200) pingDisplay.classList.add('text-orange-300');
+                    else pingDisplay.classList.add('text-red-300');
+                } else {
+                    pingDisplay.textContent = 'X';
+                    pingDisplay.classList.add('text-red-300');
+                }
+            }
+        };
+        pingXhr.open("GET", "ping.php?host=8.8.8.8&interface=tun0", true);
+        pingXhr.send();
+
+        // 2. Обновляем Статус Соединения и Кнопки
+        const statusBadge = document.getElementById('connection-status-badge');
+        const startBtn = document.getElementById('wireguard-start-btn');
+        const stopBtn = document.getElementById('wireguard-stop-btn');
+        const statusXhr = new XMLHttpRequest();
+        statusXhr.onreadystatechange = function() {
+            if (statusXhr.readyState == 4 && statusXhr.status == 200) {
+                const status = statusXhr.responseText.trim();
+                if (status === 'connected') {
+                    statusBadge.innerHTML = '<span class="bg-green-500/20 text-green-300 px-3 py-1 rounded-full text-sm font-semibold">Установлено</span>';
+                    if (startBtn && stopBtn) {
+                        startBtn.classList.add('hidden');
+                        stopBtn.classList.remove('hidden');
+                    }
+                } else {
+                    statusBadge.innerHTML = '<span class="bg-red-500/20 text-red-300 px-3 py-1 rounded-full text-sm font-semibold">Разорвано</span>';
+                    if (startBtn && stopBtn) {
+                        startBtn.classList.remove('hidden');
+                        stopBtn.classList.add('hidden');
+                    }
+                }
+            }
+        };
+        statusXhr.open("GET", "status_check.php", true);
+        statusXhr.send();
+    }
+
+    // Запускаем обновление при загрузке страницы и затем каждые 3 секунды
+    document.addEventListener('DOMContentLoaded', () => {
+        updateLiveStatus();
+        liveUpdateInterval = setInterval(updateLiveStatus, 3000); // Сохраняем ID таймера
+    });
+
+    const vpnForm = document.getElementById('vpn-control-form');
+    if (vpnForm) {
+        vpnForm.addEventListener('submit', function(e) {
+            e.preventDefault(); 
+            clearInterval(liveUpdateInterval); // 1. ОСТАНАВЛИВАЕМ ТАЙМЕР
+
+            const formData = new FormData(this);
+            const submitter = e.submitter;
+            
+            if (submitter) {
+                formData.append(submitter.name, submitter.value || '');
+            }
+
+            // 2. МГНОВЕННАЯ ОБРАТНАЯ СВЯЗЬ
+            const startBtn = document.getElementById('wireguard-start-btn');
+            const stopBtn = document.getElementById('wireguard-stop-btn');
+            const originalStartText = startBtn.textContent;
+            const originalStopText = stopBtn.textContent;
+
+            startBtn?.setAttribute('disabled', true);
+            stopBtn?.setAttribute('disabled', true);
+            
+            if (submitter && submitter.name === 'wireguard_start') {
+                startBtn.textContent = 'Запускается...';
+            } else if (submitter) {
+                stopBtn.textContent = 'Останавливается...';
+            }
+
+            // 3. ОТПРАВЛЯЕМ КОМАНДУ НА СЕРВЕР
+            fetch(window.location.href, { method: 'POST', body: formData })
+                .then(() => {
+                    // 4. ПРИНУДИТЕЛЬНО ПРОВЕРЯЕМ СТАТУС ПОСЛЕ ЗАДЕРЖКИ
+                    setTimeout(updateLiveStatus, 2000); 
+                })
+                .finally(() => {
+                    // 5. ВОЗОБНОВЛЯЕМ РАБОТУ ИНТЕРФЕЙСА
+                    setTimeout(() => {
+                        startBtn?.removeAttribute('disabled');
+                        stopBtn?.removeAttribute('disabled');
+                        startBtn.textContent = originalStartText;
+                        stopBtn.textContent = originalStopText;
+                        // 6. ПЕРЕЗАПУСКАЕМ ТАЙМЕР
+                        liveUpdateInterval = setInterval(updateLiveStatus, 3000);
+                    }, 2500);
+                });
+        });
+    }
 </script>

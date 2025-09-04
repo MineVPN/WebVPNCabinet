@@ -11,7 +11,23 @@ if(isset($_POST['menu'])){
     $_GET['menu'] = $_POST['menu'];
 }
 
-$menu_item = isset($_GET['menu']) ? $_GET['menu'] : 'openvpn';
+// ИЗМЕНЕНИЕ: Умное определение страницы по умолчанию при входе
+if (isset($_GET['menu'])) {
+    // Если пункт меню задан в URL, используем его
+    $menu_item = $_GET['menu'];
+} else {
+    // Если не задан (первый вход после логина), определяем по конфигу
+    $wireguard_config_path = '/etc/wireguard/tun0.conf';
+    $openvpn_config_path = '/etc/openvpn/tun0.conf';
+
+    if (file_exists($wireguard_config_path)) {
+        $menu_item = 'wireguard'; // По умолчанию WireGuard, если есть конфиг
+    } elseif (file_exists($openvpn_config_path)) {
+        $menu_item = 'openvpn'; // Иначе OpenVPN, если есть конфиг
+    } else {
+        $menu_item = 'openvpn'; // Запасной вариант по умолчанию
+    }
+}
 
 $menu_pages = [
     'openvpn' => 'openvpn.php',
@@ -22,7 +38,7 @@ $menu_pages = [
 ];
 
 if (!array_key_exists($menu_item, $menu_pages)) {
-    $menu_item = 'openvpn';
+    $menu_item = 'openvpn'; // Защита от неверного параметра
 }
 ?>
 <!DOCTYPE html>
@@ -42,7 +58,7 @@ if (!array_key_exists($menu_item, $menu_pages)) {
         border: 1px solid rgba(255, 255, 255, 0.1);
     }
 
-    /* ДОБАВЬ НОВЫЕ СТИЛИ СЮДА */
+    /* Стили для скроллбара */
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: #1e293b; }
     ::-webkit-scrollbar-thumb { background-color: #475569; border-radius: 10px; border: 2px solid #1e293b; }
@@ -90,10 +106,10 @@ if (!array_key_exists($menu_item, $menu_pages)) {
                 <a href="cabinet.php?menu=netsettings" class="flex items-center gap-4 px-4 py-3 rounded-lg transition-colors
                     <?php echo ($menu_item == 'netsettings') ? 'bg-violet-500/20 text-white shadow-inner' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'; ?>">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.25 12h17.5"></path>
-  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2.25c-4.14 3.333-4.14 13.167 0 19.5 4.14-6.333 4.14-16.167 0-19.5z"></path>
-</svg>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.25 12h17.5"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2.25c-4.14 3.333-4.14 13.167 0 19.5 4.14-6.333 4.14-16.167 0-19.5z"></path>
+                    </svg>
                     <span class="font-medium">Настройки сети</span>
                 </a>
                 <a href="cabinet.php?menu=settings" class="flex items-center gap-4 px-4 py-3 rounded-lg transition-colors
@@ -111,16 +127,17 @@ if (!array_key_exists($menu_item, $menu_pages)) {
 
         <main class="flex-grow p-4 sm:p-8 w-full">
             
-
             <div class="glassmorphism rounded-2xl p-6 sm:p-8 h-full">
-                <div class="bg-sky-500/20 text-sky-300 p-4 rounded-xl border border-sky-500/30 mb-6 text-center">
-                Покупай только лучшие VPN конфиги у MineVPN (<a href='https://minevpn.net/' target="_blank" class="font-bold hover:underline">Сайт</a> | <a href='https://t.me/MineVpn_Bot' target="_blank" class="font-bold hover:underline">Telegram Bot</a>)
-            </div>
+                
                 <div class="notice hidden bg-green-500/20 text-green-300 p-4 rounded-xl border border-green-500/30 mb-6"></div>
                 <?php
                 include_once $menu_pages[$menu_item];
                 ?>
+                <div class="bg-sky-500/20 text-sky-300 p-4 rounded-xl border border-sky-500/30 mt-6 text-center">
+                Покупай только лучшие VPN конфиги у MineVPN (<a href='https://minevpn.net/' target="_blank" class="font-bold hover:underline">Сайт</a> | <a href='https://t.me/MineVpn_Bot' target="_blank" class="font-bold hover:underline">Telegram Bot</a>)
             </div>
+            </div>
+
         </main>
     </div>
 </body>

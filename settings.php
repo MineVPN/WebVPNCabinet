@@ -1,6 +1,4 @@
 <?php
-// ----- PHP-ЛОГИКА ДЛЯ СТРАНИЦЫ НАСТРОЕК -----
-session_start();
 
 // Проверка аутентификации
 if (!isset($_SESSION["authenticated"]) || $_SESSION["authenticated"] !== true) {
