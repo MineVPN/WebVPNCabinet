@@ -10,7 +10,7 @@ sudo git pull origin main
 cd
 echo "Репозиторий обновлен."
 
-chmod 777 /var/www/html/settings
+chmod 777 /var/www/settings
 
 
 # --- Путь к файлу, где хранится текущая версия на сервере ---
