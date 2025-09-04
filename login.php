@@ -22,10 +22,6 @@
                     <img src="logo.png" alt="Server Logo" class="w-48 h-48 mx-auto mb-4">
                 </div>
                 <div>
-                    <label for="username" class="block mb-2 text-sm font-medium text-slate-400">Пользователь:</label>
-                    <input disabled type="text" id="username" name="username" required value="root" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg p-3 text-white placeholder-slate-400 focus:ring-2 focus:ring-violet-500 focus:outline-none transition">
-                </div>
-                <div>
                     <label for="password" class="block mb-2 text-sm font-medium text-slate-400">Пароль:</label>
                     <input type="password" id="password" name="password" required class="w-full bg-slate-700/50 border border-slate-600 rounded-lg p-3 text-white placeholder-slate-400 focus:ring-2 focus:ring-violet-500 focus:outline-none transition">
                 </div>
@@ -59,3 +55,4 @@
 
 </body>
 </html>
+
