@@ -17,6 +17,7 @@ $menu_pages = [
     'openvpn' => 'openvpn.php',
     'wireguard' => 'wireguard.php',
     'ping' => 'pinger.php',
+    'netsettings' => 'netsettings.php',
     'settings' => 'settings.php'
 ];
 
@@ -85,6 +86,15 @@ if (!array_key_exists($menu_item, $menu_pages)) {
                     <?php echo ($menu_item == 'ping') ? 'bg-violet-500/20 text-white shadow-inner' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'; ?>">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                     <span class="font-medium">Ping</span>
+                </a>
+                <a href="cabinet.php?menu=netsettings" class="flex items-center gap-4 px-4 py-3 rounded-lg transition-colors
+                    <?php echo ($menu_item == 'netsettings') ? 'bg-violet-500/20 text-white shadow-inner' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'; ?>">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.25 12h17.5"></path>
+  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2.25c-4.14 3.333-4.14 13.167 0 19.5 4.14-6.333 4.14-16.167 0-19.5z"></path>
+</svg>
+                    <span class="font-medium">Настройки сети</span>
                 </a>
                 <a href="cabinet.php?menu=settings" class="flex items-center gap-4 px-4 py-3 rounded-lg transition-colors
                     <?php echo ($menu_item == 'settings') ? 'bg-violet-500/20 text-white shadow-inner' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'; ?>">
