@@ -26,7 +26,7 @@ if (!isset($_SESSION["authenticated"]) || $_SESSION["authenticated"] !== true) {
 </head>
 <body class="bg-slate-900 text-slate-200 min-h-screen p-4 sm:p-8">
 
-    <div class="max-w-4xl mx-auto">
+    <div class="mx-auto">
 
         <div class="flex flex-col gap-8">
 
@@ -215,3 +215,4 @@ if (!isset($_SESSION["authenticated"]) || $_SESSION["authenticated"] !== true) {
 
 </body>
 </html>
+
