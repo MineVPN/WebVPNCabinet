@@ -1,6 +1,6 @@
 <?php
 // ==============================================================================
-// MINE SERVER - Настройки сети
+// MINE SERVER - Настройки сети (WAN интерфейс)
 // ==============================================================================
 
 if (!isset($_SESSION["authenticated"]) || $_SESSION["authenticated"] !== true) {
@@ -9,283 +9,367 @@ if (!isset($_SESSION["authenticated"]) || $_SESSION["authenticated"] !== true) {
 }
 
 $csrf_token = $_SESSION['csrf_token'] ?? '';
+$netplan_file = '/etc/netplan/01-mineserver.yaml';
+
+// Определение WAN интерфейса (первый в netplan)
+function getWanInterface() {
+    global $netplan_file;
+    
+    if (file_exists($netplan_file)) {
+        $content = file_get_contents($netplan_file);
+        preg_match_all('/^\s{4}(\w+):/m', $content, $matches);
+        if (!empty($matches[1][0])) {
+            return $matches[1][0];
+        }
+    }
+    
+    // Fallback - интерфейс с default route
+    $route = shell_exec('ip route | grep default | awk \'{print $5}\' | head -1');
+    return trim($route) ?: 'eth0';
+}
+
+// Получение текущих настроек WAN
+function getWanConfig() {
+    global $netplan_file;
+    $wan = getWanInterface();
+    
+    $config = [
+        'interface' => $wan,
+        'mode' => 'dhcp',
+        'ip' => '',
+        'gateway' => '',
+        'dns1' => '8.8.8.8',
+        'dns2' => '1.1.1.1'
+    ];
+    
+    if (file_exists($netplan_file)) {
+        $content = file_get_contents($netplan_file);
+        
+        // Ищем секцию WAN интерфейса
+        if (preg_match('/\s{4}' . preg_quote($wan, '/') . ':(.+?)(?=\n\s{4}\w+:|\n\s{2}\w|\Z)/s', $content, $m)) {
+            $section = $m[1];
+            
+            if (strpos($section, 'dhcp4: true') !== false || strpos($section, 'dhcp4: yes') !== false) {
+                $config['mode'] = 'dhcp';
+            } else {
+                $config['mode'] = 'static';
+                
+                if (preg_match('/addresses:\s*\[\s*([^\]]+)\s*\]/', $section, $ip)) {
+                    $config['ip'] = trim($ip[1]);
+                }
+                
+                // routes с gateway
+                if (preg_match('/via:\s*([0-9.]+)/', $section, $gw)) {
+                    $config['gateway'] = $gw[1];
+                }
+                // Старый формат gateway4
+                if (preg_match('/gateway4:\s*([0-9.]+)/', $section, $gw)) {
+                    $config['gateway'] = $gw[1];
+                }
+                
+                if (preg_match('/nameservers:.*?addresses:\s*\[([^\]]+)\]/s', $section, $dns)) {
+                    $servers = array_map('trim', explode(',', $dns[1]));
+                    $config['dns1'] = $servers[0] ?? '8.8.8.8';
+                    $config['dns2'] = $servers[1] ?? '';
+                }
+            }
+        }
+    }
+    
+    // Получаем текущий IP из системы
+    $current_ip = trim(shell_exec("ip -4 addr show {$wan} | grep -oP '(?<=inet\s)\d+(\.\d+){3}/\d+' | head -1") ?: '');
+    if ($config['mode'] === 'dhcp' && $current_ip) {
+        $config['current_ip'] = $current_ip;
+    }
+    
+    return $config;
+}
+
+// Сохранение настроек WAN
+function saveWanConfig($config) {
+    global $netplan_file;
+    
+    if (!file_exists($netplan_file)) {
+        return ['success' => false, 'error' => 'Файл netplan не найден'];
+    }
+    
+    $content = file_get_contents($netplan_file);
+    $wan = $config['interface'];
+    
+    // Формируем новую конфигурацию WAN
+    if ($config['mode'] === 'dhcp') {
+        $new_config = "    {$wan}:\n";
+        $new_config .= "      dhcp4: true\n";
+    } else {
+        $new_config = "    {$wan}:\n";
+        $new_config .= "      dhcp4: false\n";
+        $new_config .= "      addresses: [{$config['ip']}]\n";
+        $new_config .= "      routes:\n";
+        $new_config .= "        - to: default\n";
+        $new_config .= "          via: {$config['gateway']}\n";
+        $new_config .= "      nameservers:\n";
+        $dns = $config['dns1'];
+        if (!empty($config['dns2'])) $dns .= ", {$config['dns2']}";
+        $new_config .= "        addresses: [{$dns}]\n";
+    }
+    
+    // Заменяем секцию WAN интерфейса
+    $pattern = '/(\s{4}' . preg_quote($wan, '/') . ':)(.+?)(?=\n\s{4}\w+:|\n\s{2}\w|\Z)/s';
+    
+    if (preg_match($pattern, $content)) {
+        $content = preg_replace($pattern, rtrim($new_config), $content);
+    }
+    
+    // Бэкап
+    copy($netplan_file, $netplan_file . '.bak');
+    file_put_contents($netplan_file, $content);
+    
+    // Применяем с try (10 сек откат)
+    $output = shell_exec('sudo netplan try --timeout 10 2>&1');
+    
+    if (strpos($output, 'error') !== false || strpos($output, 'Error') !== false) {
+        // Откат
+        copy($netplan_file . '.bak', $netplan_file);
+        shell_exec('sudo netplan apply 2>&1');
+        return ['success' => false, 'error' => 'Ошибка применения: ' . $output];
+    }
+    
+    shell_exec('sudo netplan apply 2>&1');
+    return ['success' => true];
+}
+
+// Получение информации об интерфейсах
+function getInterfacesInfo() {
+    $interfaces = [];
+    
+    $output = shell_exec('ip -j addr 2>/dev/null') ?: '';
+    $data = @json_decode($output, true) ?: [];
+    
+    foreach ($data as $iface) {
+        if ($iface['ifname'] === 'lo') continue;
+        
+        $ipv4 = '';
+        foreach ($iface['addr_info'] ?? [] as $addr) {
+            if ($addr['family'] === 'inet') {
+                $ipv4 = $addr['local'] . '/' . $addr['prefixlen'];
+                break;
+            }
+        }
+        
+        // Получаем трафик
+        $rx = @file_get_contents("/sys/class/net/{$iface['ifname']}/statistics/rx_bytes") ?: 0;
+        $tx = @file_get_contents("/sys/class/net/{$iface['ifname']}/statistics/tx_bytes") ?: 0;
+        
+        $interfaces[] = [
+            'name' => $iface['ifname'],
+            'status' => in_array('UP', $iface['flags'] ?? []) ? 'up' : 'down',
+            'mac' => $iface['address'] ?? '',
+            'ipv4' => $ipv4,
+            'rx' => formatBytes((int)$rx),
+            'tx' => formatBytes((int)$tx)
+        ];
+    }
+    
+    return $interfaces;
+}
+
+function formatBytes($bytes) {
+    if ($bytes >= 1073741824) return round($bytes / 1073741824, 1) . ' GB';
+    if ($bytes >= 1048576) return round($bytes / 1048576, 1) . ' MB';
+    if ($bytes >= 1024) return round($bytes / 1024, 1) . ' KB';
+    return $bytes . ' B';
+}
 
 // Обработка POST
+$message = '';
+$messageType = 'success';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['csrf_token'])) {
     if (hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
         
-        if (isset($_POST['apply_netplan'])) {
-            $output = shell_exec('sudo netplan apply 2>&1');
-            echo "<script>Notice('Сетевые настройки применены!');</script>";
+        if (isset($_POST['save_wan'])) {
+            $config = [
+                'interface' => getWanInterface(),
+                'mode' => $_POST['mode'] === 'static' ? 'static' : 'dhcp',
+                'ip' => trim($_POST['ip'] ?? ''),
+                'gateway' => trim($_POST['gateway'] ?? ''),
+                'dns1' => trim($_POST['dns1'] ?? '8.8.8.8'),
+                'dns2' => trim($_POST['dns2'] ?? '')
+            ];
+            
+            if ($config['mode'] === 'static') {
+                if (!preg_match('/^\d+\.\d+\.\d+\.\d+\/\d+$/', $config['ip'])) {
+                    $message = 'Неверный формат IP. Используйте: 192.168.1.100/24';
+                    $messageType = 'error';
+                } elseif (!filter_var($config['gateway'], FILTER_VALIDATE_IP)) {
+                    $message = 'Неверный формат шлюза';
+                    $messageType = 'error';
+                } else {
+                    $result = saveWanConfig($config);
+                    if ($result['success']) {
+                        $message = 'Настройки сохранены';
+                    } else {
+                        $message = $result['error'];
+                        $messageType = 'error';
+                    }
+                }
+            } else {
+                $result = saveWanConfig($config);
+                $message = $result['success'] ? 'DHCP активирован' : $result['error'];
+                $messageType = $result['success'] ? 'success' : 'error';
+            }
         }
         
-        if (isset($_POST['restart_dnsmasq'])) {
-            shell_exec('sudo systemctl restart dnsmasq');
-            echo "<script>Notice('DNS/DHCP сервер перезапущен!');</script>";
+        if (isset($_POST['apply_netplan'])) {
+            shell_exec('sudo netplan apply 2>&1');
+            $message = 'Сетевые настройки применены';
         }
     }
 }
+
+$wanConfig = getWanConfig();
+$interfaces = getInterfacesInfo();
+
+// Внешний IP
+$external_ip = trim(shell_exec('curl -s --max-time 5 https://api.ipify.org 2>/dev/null') ?: 'Не определён');
+$vpn_ip = trim(shell_exec('curl -s --max-time 5 --interface tun0 https://api.ipify.org 2>/dev/null') ?: '');
 ?>
 
-<div class="space-y-8">
+<?php if ($message): ?>
+<div class="p-4 rounded-xl border mb-4 <?= $messageType === 'error' ? 'bg-red-500/20 border-red-500/30 text-red-300' : 'bg-green-500/20 border-green-500/30 text-green-300' ?>">
+    <?= htmlspecialchars($message) ?>
+</div>
+<?php endif; ?>
+
+<div class="space-y-6">
     
-    <!-- Внешний IP -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="glassmorphism rounded-2xl p-6">
-            <h3 class="text-lg font-bold text-white mb-4">Реальный IP (без VPN)</h3>
-            <div class="flex items-center gap-4">
-                <div class="w-12 h-12 bg-slate-700 rounded-xl flex items-center justify-center">
-                    <svg class="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path>
-                    </svg>
-                </div>
-                <div>
-                    <div class="text-2xl font-bold text-white font-mono" id="real-ip">Загрузка...</div>
-                    <div class="text-slate-400 text-sm">Ваш провайдер</div>
-                </div>
-            </div>
+    <!-- IP адреса -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="glassmorphism rounded-xl p-4">
+            <div class="text-slate-400 text-sm mb-1">Внешний IP (реальный)</div>
+            <div class="text-2xl font-bold text-white font-mono"><?= htmlspecialchars($external_ip) ?></div>
         </div>
-        
-        <div class="glassmorphism rounded-2xl p-6">
-            <h3 class="text-lg font-bold text-white mb-4">VPN IP (через туннель)</h3>
-            <div class="flex items-center gap-4">
-                <div class="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center">
-                    <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-                    </svg>
-                </div>
-                <div>
-                    <div class="text-2xl font-bold text-green-400 font-mono" id="vpn-ip">Загрузка...</div>
-                    <div class="text-slate-400 text-sm">VPN сервер</div>
-                </div>
+        <div class="glassmorphism rounded-xl p-4">
+            <div class="text-slate-400 text-sm mb-1">VPN IP</div>
+            <div class="text-2xl font-bold font-mono <?= $vpn_ip ? 'text-green-400' : 'text-slate-500' ?>">
+                <?= $vpn_ip ?: 'VPN не активен' ?>
             </div>
         </div>
     </div>
     
-    <!-- Сетевые интерфейсы -->
+    <!-- Настройка WAN -->
     <div class="glassmorphism rounded-2xl p-6">
-        <div class="flex items-center justify-between mb-6">
-            <h2 class="text-xl font-bold text-white">Сетевые интерфейсы</h2>
-            <button onclick="refreshInterfaces()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm transition">
-                Обновить
-            </button>
-        </div>
+        <h2 class="text-xl font-bold text-white mb-6">
+            Настройка WAN интерфейса 
+            <span class="text-sm text-slate-400 font-normal">(<?= htmlspecialchars($wanConfig['interface']) ?>)</span>
+        </h2>
+        
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
+            
+            <div class="mb-4">
+                <label class="block text-sm text-slate-400 mb-2">Режим подключения</label>
+                <div class="flex gap-4">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="mode" value="dhcp" <?= $wanConfig['mode'] === 'dhcp' ? 'checked' : '' ?> 
+                            onchange="toggleMode()" class="text-violet-600">
+                        <span class="text-white">DHCP (автоматически)</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="mode" value="static" <?= $wanConfig['mode'] === 'static' ? 'checked' : '' ?>
+                            onchange="toggleMode()" class="text-violet-600">
+                        <span class="text-white">Статический IP</span>
+                    </label>
+                </div>
+            </div>
+            
+            <?php if ($wanConfig['mode'] === 'dhcp' && !empty($wanConfig['current_ip'])): ?>
+            <div class="mb-4 p-3 bg-slate-800/50 rounded-lg">
+                <span class="text-slate-400 text-sm">Текущий IP (получен по DHCP):</span>
+                <span class="text-white font-mono ml-2"><?= htmlspecialchars($wanConfig['current_ip']) ?></span>
+            </div>
+            <?php endif; ?>
+            
+            <div id="static-fields" class="<?= $wanConfig['mode'] === 'dhcp' ? 'hidden' : '' ?>">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">IP адрес с маской</label>
+                        <input type="text" name="ip" value="<?= htmlspecialchars($wanConfig['ip']) ?>" 
+                            placeholder="192.168.1.100/24"
+                            class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2 text-white font-mono text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">Шлюз (Gateway)</label>
+                        <input type="text" name="gateway" value="<?= htmlspecialchars($wanConfig['gateway']) ?>" 
+                            placeholder="192.168.1.1"
+                            class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2 text-white font-mono text-sm">
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">DNS 1</label>
+                        <input type="text" name="dns1" value="<?= htmlspecialchars($wanConfig['dns1']) ?>" 
+                            class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2 text-white font-mono text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-1">DNS 2</label>
+                        <input type="text" name="dns2" value="<?= htmlspecialchars($wanConfig['dns2']) ?>" 
+                            class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2 text-white font-mono text-sm">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex gap-2">
+                <button type="submit" name="save_wan" class="bg-violet-600 hover:bg-violet-700 text-white font-medium py-2 px-6 rounded-lg transition">
+                    Сохранить
+                </button>
+                <button type="submit" name="apply_netplan" class="bg-slate-700 hover:bg-slate-600 text-white font-medium py-2 px-4 rounded-lg transition">
+                    Применить netplan
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Интерфейсы -->
+    <div class="glassmorphism rounded-2xl p-6">
+        <h2 class="text-xl font-bold text-white mb-4">Сетевые интерфейсы</h2>
         
         <div class="overflow-x-auto">
-            <table class="w-full">
+            <table class="w-full text-sm">
                 <thead>
-                    <tr class="text-left text-slate-400 text-sm border-b border-slate-700">
-                        <th class="pb-3 font-medium">Интерфейс</th>
-                        <th class="pb-3 font-medium">Тип</th>
-                        <th class="pb-3 font-medium">IP адрес</th>
-                        <th class="pb-3 font-medium">MAC</th>
-                        <th class="pb-3 font-medium">Статус</th>
-                        <th class="pb-3 font-medium">Трафик ↓/↑</th>
+                    <tr class="text-left text-slate-400 border-b border-slate-700">
+                        <th class="pb-2">Интерфейс</th>
+                        <th class="pb-2">Статус</th>
+                        <th class="pb-2">IP адрес</th>
+                        <th class="pb-2">MAC</th>
+                        <th class="pb-2">RX / TX</th>
                     </tr>
                 </thead>
-                <tbody id="interfaces-table" class="text-sm">
-                    <tr><td colspan="6" class="py-4 text-slate-400">Загрузка...</td></tr>
+                <tbody>
+                    <?php foreach ($interfaces as $iface): ?>
+                    <tr class="border-b border-slate-800">
+                        <td class="py-2 font-mono text-white"><?= htmlspecialchars($iface['name']) ?></td>
+                        <td class="py-2">
+                            <span class="px-2 py-0.5 rounded text-xs <?= $iface['status'] === 'up' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400' ?>">
+                                <?= $iface['status'] === 'up' ? 'UP' : 'DOWN' ?>
+                            </span>
+                        </td>
+                        <td class="py-2 font-mono text-slate-300"><?= htmlspecialchars($iface['ipv4'] ?: '-') ?></td>
+                        <td class="py-2 font-mono text-slate-400 text-xs"><?= htmlspecialchars($iface['mac']) ?></td>
+                        <td class="py-2 text-slate-400"><?= $iface['rx'] ?> / <?= $iface['tx'] ?></td>
+                    </tr>
+                    <?php endforeach; ?>
                 </tbody>
             </table>
         </div>
     </div>
-    
-    <!-- Подключённые устройства -->
-    <div class="glassmorphism rounded-2xl p-6">
-        <div class="flex items-center justify-between mb-6">
-            <h2 class="text-xl font-bold text-white">Устройства в локальной сети</h2>
-            <button onclick="refreshDevices()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm transition">
-                Сканировать
-            </button>
-        </div>
-        
-        <div class="overflow-x-auto">
-            <table class="w-full">
-                <thead>
-                    <tr class="text-left text-slate-400 text-sm border-b border-slate-700">
-                        <th class="pb-3 font-medium">IP адрес</th>
-                        <th class="pb-3 font-medium">MAC адрес</th>
-                        <th class="pb-3 font-medium">Hostname</th>
-                        <th class="pb-3 font-medium">Производитель</th>
-                    </tr>
-                </thead>
-                <tbody id="devices-table" class="text-sm">
-                    <tr><td colspan="4" class="py-4 text-slate-400">Загрузка...</td></tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-    
-    <!-- Действия -->
-    <div class="glassmorphism rounded-2xl p-6">
-        <h2 class="text-xl font-bold text-white mb-6">Управление сетью</h2>
-        
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <form method="POST">
-                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
-                <button type="submit" name="apply_netplan" class="w-full bg-violet-600 hover:bg-violet-700 text-white font-medium py-3 px-4 rounded-lg transition">
-                    Применить Netplan
-                </button>
-            </form>
-            
-            <form method="POST">
-                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
-                <button type="submit" name="restart_dnsmasq" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-medium py-3 px-4 rounded-lg transition">
-                    Перезапустить DNS/DHCP
-                </button>
-            </form>
-            
-            <button onclick="runSpeedtest()" id="speedtest-btn" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-medium py-3 px-4 rounded-lg transition">
-                Тест скорости
-            </button>
-        </div>
-        
-        <!-- Результат speedtest -->
-        <div id="speedtest-result" class="hidden mt-6 p-4 bg-slate-800/50 rounded-xl">
-            <div class="grid grid-cols-3 gap-4 text-center">
-                <div>
-                    <div class="text-slate-400 text-sm">Ping</div>
-                    <div class="text-2xl font-bold text-white" id="st-ping">--</div>
-                </div>
-                <div>
-                    <div class="text-slate-400 text-sm">Download</div>
-                    <div class="text-2xl font-bold text-green-400" id="st-download">--</div>
-                </div>
-                <div>
-                    <div class="text-slate-400 text-sm">Upload</div>
-                    <div class="text-2xl font-bold text-blue-400" id="st-upload">--</div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
 </div>
 
 <script>
-// Загрузка IP адресов
-async function loadIPs() {
-    try {
-        const response = await fetch('api/network.php?action=all');
-        const data = await response.json();
-        
-        document.getElementById('real-ip').textContent = data.external_ip || 'Не определён';
-        document.getElementById('vpn-ip').textContent = data.external_ip_vpn || 'VPN не активен';
-        
-        if (data.external_ip_vpn) {
-            document.getElementById('vpn-ip').classList.remove('text-slate-400');
-            document.getElementById('vpn-ip').classList.add('text-green-400');
-        } else {
-            document.getElementById('vpn-ip').classList.remove('text-green-400');
-            document.getElementById('vpn-ip').classList.add('text-slate-400');
-        }
-    } catch (error) {
-        console.error('Error loading IPs:', error);
-    }
+function toggleMode() {
+    const staticFields = document.getElementById('static-fields');
+    const isStatic = document.querySelector('input[name="mode"]:checked').value === 'static';
+    staticFields.classList.toggle('hidden', !isStatic);
 }
-
-// Загрузка интерфейсов
-async function refreshInterfaces() {
-    try {
-        const response = await fetch('api/network.php?action=interfaces');
-        const interfaces = await response.json();
-        
-        const tbody = document.getElementById('interfaces-table');
-        tbody.innerHTML = '';
-        
-        interfaces.forEach(iface => {
-            const statusClass = iface.status === 'up' ? 'bg-green-500' : 'bg-red-500';
-            const statusText = iface.status === 'up' ? 'UP' : 'DOWN';
-            
-            tbody.innerHTML += `
-                <tr class="border-b border-slate-800">
-                    <td class="py-3 font-mono text-white">${iface.name}</td>
-                    <td class="py-3 text-slate-400">${iface.type}</td>
-                    <td class="py-3 font-mono text-slate-300">${iface.ipv4 || '-'}</td>
-                    <td class="py-3 font-mono text-slate-400 text-xs">${iface.mac || '-'}</td>
-                    <td class="py-3">
-                        <span class="px-2 py-1 rounded text-xs ${statusClass}/20 text-${iface.status === 'up' ? 'green' : 'red'}-400">${statusText}</span>
-                    </td>
-                    <td class="py-3 text-slate-400">${iface.rx_formatted} / ${iface.tx_formatted}</td>
-                </tr>
-            `;
-        });
-    } catch (error) {
-        console.error('Error loading interfaces:', error);
-    }
-}
-
-// Загрузка устройств
-async function refreshDevices() {
-    const tbody = document.getElementById('devices-table');
-    tbody.innerHTML = '<tr><td colspan="4" class="py-4 text-slate-400">Сканирование сети...</td></tr>';
-    
-    try {
-        const response = await fetch('api/network.php?action=devices');
-        const devices = await response.json();
-        
-        tbody.innerHTML = '';
-        
-        if (devices.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="py-4 text-slate-400">Устройства не найдены</td></tr>';
-            return;
-        }
-        
-        devices.forEach(device => {
-            tbody.innerHTML += `
-                <tr class="border-b border-slate-800">
-                    <td class="py-3 font-mono text-white">${device.ip}</td>
-                    <td class="py-3 font-mono text-slate-400 text-xs">${device.mac}</td>
-                    <td class="py-3 text-slate-300">${device.hostname || '-'}</td>
-                    <td class="py-3 text-slate-400">${device.vendor || '-'}</td>
-                </tr>
-            `;
-        });
-    } catch (error) {
-        console.error('Error loading devices:', error);
-        tbody.innerHTML = '<tr><td colspan="4" class="py-4 text-red-400">Ошибка загрузки</td></tr>';
-    }
-}
-
-// Speedtest
-async function runSpeedtest() {
-    const btn = document.getElementById('speedtest-btn');
-    const result = document.getElementById('speedtest-result');
-    
-    btn.disabled = true;
-    btn.textContent = 'Тестирование...';
-    result.classList.remove('hidden');
-    
-    document.getElementById('st-ping').textContent = '...';
-    document.getElementById('st-download').textContent = '...';
-    document.getElementById('st-upload').textContent = '...';
-    
-    try {
-        const response = await fetch('api/server.php?action=speedtest', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ csrf_token: window.CSRF_TOKEN })
-        });
-        const data = await response.json();
-        
-        if (data.error) {
-            Notice(data.error, 'error');
-        } else {
-            document.getElementById('st-ping').textContent = data.ping ? data.ping + ' мс' : '--';
-            document.getElementById('st-download').textContent = data.download ? data.download + ' Мбит/с' : '--';
-            document.getElementById('st-upload').textContent = data.upload ? data.upload + ' Мбит/с' : '--';
-        }
-    } catch (error) {
-        Notice('Ошибка теста скорости', 'error');
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Тест скорости';
-    }
-}
-
-// Инициализация
-document.addEventListener('DOMContentLoaded', () => {
-    loadIPs();
-    refreshInterfaces();
-    refreshDevices();
-});
 </script>

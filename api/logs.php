@@ -1,249 +1,141 @@
 <?php
 // ==============================================================================
-// MINE SERVER - API логов VPN (исправленная версия)
+// MINE SERVER - API логов
 // ==============================================================================
 
 header('Content-Type: application/json');
+header('Cache-Control: no-cache');
 
 session_start();
 if (!isset($_SESSION["authenticated"]) || $_SESSION["authenticated"] !== true) {
     http_response_code(401);
-    echo json_encode(['error' => 'Unauthorized']);
-    exit();
+    die(json_encode(['error' => 'Unauthorized']));
 }
 
-$lines = isset($_GET['lines']) ? (int)$_GET['lines'] : 100;
-$lines = min($lines, 1000);
 $type = $_GET['type'] ?? 'system';
+$lines = min((int)($_GET['lines'] ?? 100), 500);
 
-/**
- * Получение логов через sudo journalctl
- */
 function getJournalLogs($unit, $lines) {
-    $unit = escapeshellarg($unit);
-    $lines = (int)$lines;
-    
-    // ВАЖНО: используем sudo для доступа к journalctl
-    $cmd = "sudo journalctl -u $unit -n $lines --no-pager -o short-iso 2>&1";
+    // Используем sudo journalctl
+    $cmd = "sudo journalctl -u " . escapeshellarg($unit) . " -n $lines --no-pager -o short-iso 2>/dev/null";
     $output = shell_exec($cmd);
     
-    // Fallback без sudo если не работает
-    if (empty($output) || strpos($output, 'No journal files') !== false) {
-        $cmd = "journalctl -u $unit -n $lines --no-pager -o short-iso 2>&1";
-        $output = shell_exec($cmd);
-    }
-    
-    return parseJournalOutput($output);
-}
-
-/**
- * Получение всех системных логов
- */
-function getAllSystemLogs($lines) {
-    $lines = (int)$lines;
-    
-    // Логи VPN сервисов
-    $cmd = "sudo journalctl -u 'openvpn@*' -u 'wg-quick@*' -u vpn-healthcheck -n $lines --no-pager -o short-iso 2>&1";
-    $output = shell_exec($cmd);
-    
-    if (empty($output) || strpos($output, 'No journal files') !== false) {
-        $cmd = "journalctl -u 'openvpn@*' -u 'wg-quick@*' -u vpn-healthcheck -n $lines --no-pager -o short-iso 2>&1";
-        $output = shell_exec($cmd);
-    }
-    
-    return parseJournalOutput($output);
-}
-
-/**
- * Парсинг вывода journalctl
- */
-function parseJournalOutput($output) {
     if (empty($output)) {
-        return [];
+        // Fallback без sudo
+        $cmd = "journalctl -u " . escapeshellarg($unit) . " -n $lines --no-pager -o short-iso 2>/dev/null";
+        $output = shell_exec($cmd);
     }
     
-    // Фильтруем служебные сообщения
-    if (strpos($output, 'No journal files') !== false || 
-        strpos($output, 'insufficient permissions') !== false ||
-        strpos($output, 'Hint:') !== false) {
-        return [];
-    }
+    return parseLogs($output);
+}
+
+function getFileLogs($file, $lines) {
+    if (!file_exists($file)) return [];
     
-    $result = [];
-    $lines = explode("\n", trim($output));
+    $cmd = is_readable($file) 
+        ? "tail -n $lines " . escapeshellarg($file) . " 2>/dev/null"
+        : "sudo tail -n $lines " . escapeshellarg($file) . " 2>/dev/null";
     
-    foreach ($lines as $line) {
+    return parseLogs(shell_exec($cmd));
+}
+
+function parseLogs($output) {
+    if (empty($output)) return [];
+    
+    $logs = [];
+    foreach (explode("\n", trim($output)) as $line) {
+        $line = trim($line);
         if (empty($line)) continue;
         
-        // Пропускаем hint сообщения
+        // Пропускаем служебные сообщения
         if (strpos($line, 'Hint:') !== false || 
-            strpos($line, 'Users in groups') !== false ||
-            strpos($line, 'Pass -q') !== false ||
-            strpos($line, 'No journal files') !== false) {
+            strpos($line, 'No journal files') !== false ||
+            strpos($line, 'insufficient permissions') !== false) {
             continue;
         }
         
-        // Парсим строку: 2024-01-02T10:30:45+0000 hostname unit[pid]: message
-        if (preg_match('/^(\d{4}-\d{2}-\d{2}T[\d:]+[^\s]*)\s+(\S+)\s+(\S+?)(?:\[\d+\])?:\s*(.*)$/', $line, $matches)) {
-            $result[] = [
-                'time' => $matches[1],
-                'host' => $matches[2],
-                'unit' => $matches[3],
-                'message' => $matches[4],
-                'level' => detectLogLevel($matches[4])
-            ];
-        } else {
-            // Строка не соответствует формату
-            $result[] = [
-                'time' => null,
-                'host' => null,
-                'unit' => null,
-                'message' => $line,
-                'level' => detectLogLevel($line)
-            ];
-        }
-    }
-    
-    return $result;
-}
-
-/**
- * Определение уровня лога
- */
-function detectLogLevel($message) {
-    $msg = strtolower($message);
-    
-    if (preg_match('/error|fail|fatal|crash|exception/i', $msg)) {
-        return 'error';
-    }
-    if (preg_match('/warn|warning/i', $msg)) {
-        return 'warning';
-    }
-    if (preg_match('/started|connected|success|established|up\b|running/i', $msg)) {
-        return 'success';
-    }
-    
-    return 'info';
-}
-
-/**
- * Получение логов из файла
- */
-function getFileLogs($file, $lines) {
-    if (!file_exists($file)) {
-        return [];
-    }
-    
-    // Пробуем читать напрямую
-    if (is_readable($file)) {
-        $cmd = "tail -n " . (int)$lines . " " . escapeshellarg($file) . " 2>&1";
-    } else {
-        // Через sudo
-        $cmd = "sudo tail -n " . (int)$lines . " " . escapeshellarg($file) . " 2>&1";
-    }
-    
-    $output = shell_exec($cmd);
-    
-    if (empty($output)) {
-        return [];
-    }
-    
-    $result = [];
-    foreach (explode("\n", trim($output)) as $line) {
-        if (empty($line)) continue;
+        // Определяем уровень
+        $level = 'info';
+        $lc = strtolower($line);
+        if (preg_match('/error|fail|fatal|crash/i', $lc)) $level = 'error';
+        elseif (preg_match('/warn/i', $lc)) $level = 'warning';
+        elseif (preg_match('/started|connected|success|established/i', $lc)) $level = 'success';
         
-        $result[] = [
-            'time' => null,
-            'unit' => null,
+        // Парсим время
+        $time = null;
+        if (preg_match('/^(\d{4}-\d{2}-\d{2}T[\d:]+)/', $line, $m)) {
+            $time = $m[1];
+        }
+        
+        $logs[] = [
+            'time' => $time,
             'message' => $line,
-            'level' => detectLogLevel($line)
+            'level' => $level
         ];
     }
     
-    return $result;
+    return $logs;
 }
 
-/**
- * Получение логов healthcheck
- */
-function getHealthcheckLogs($lines) {
-    $logs = [];
-    
-    // Из journalctl
-    $journalLogs = getJournalLogs('vpn-healthcheck', $lines);
-    if (!empty($journalLogs)) {
-        $logs = array_merge($logs, $journalLogs);
-    }
-    
-    // Из файла лога
-    $fileLogs = getFileLogs('/var/log/vpn-healthcheck.log', $lines);
-    if (!empty($fileLogs)) {
-        $logs = array_merge($logs, $fileLogs);
-    }
-    
-    // Сортируем и ограничиваем
-    return array_slice($logs, -$lines);
-}
+// Проверяем существование конфига ПЕРЕД получением логов
+$hasOpenvpn = file_exists('/etc/openvpn/tun0.conf');
+$hasWireguard = file_exists('/etc/wireguard/tun0.conf');
 
-// Выбор источника логов
+$logs = [];
+
 switch ($type) {
     case 'openvpn':
-        $logs = getJournalLogs('openvpn@tun0', $lines);
-        if (empty($logs)) {
-            $logs = getFileLogs('/var/log/openvpn.log', $lines);
-        }
-        if (empty($logs)) {
-            $logs = getFileLogs('/var/log/openvpn/openvpn.log', $lines);
+        if ($hasOpenvpn) {
+            $logs = getJournalLogs('openvpn@tun0', $lines);
+        } else {
+            $logs = [['time' => date('c'), 'message' => 'OpenVPN конфигурация не установлена', 'level' => 'info']];
         }
         break;
         
     case 'wireguard':
-        $logs = getJournalLogs('wg-quick@tun0', $lines);
-        break;
-        
-    case 'system':
-        $logs = getAllSystemLogs($lines);
+        if ($hasWireguard) {
+            $logs = getJournalLogs('wg-quick@tun0', $lines);
+        } else {
+            $logs = [['time' => date('c'), 'message' => 'WireGuard конфигурация не установлена', 'level' => 'info']];
+        }
         break;
         
     case 'healthcheck':
-        $logs = getHealthcheckLogs($lines);
+        $logs = array_merge(
+            getJournalLogs('vpn-healthcheck', $lines / 2),
+            getFileLogs('/var/log/vpn-healthcheck.log', $lines / 2)
+        );
         break;
         
     case 'dnsmasq':
         $logs = getJournalLogs('dnsmasq', $lines);
-        if (empty($logs)) {
-            $logs = getFileLogs('/var/log/dnsmasq.log', $lines);
-        }
-        break;
-        
-    case 'apache':
-        $logs = getFileLogs('/var/log/apache2/error.log', $lines);
-        break;
-        
-    case 'auth':
-        $logs = getFileLogs('/var/log/auth.log', $lines);
         break;
         
     case 'syslog':
         $logs = getFileLogs('/var/log/syslog', $lines);
         break;
         
+    case 'system':
     default:
-        $logs = [];
+        // Только существующие VPN
+        if ($hasWireguard) {
+            $logs = array_merge($logs, getJournalLogs('wg-quick@tun0', $lines / 2));
+        }
+        if ($hasOpenvpn) {
+            $logs = array_merge($logs, getJournalLogs('openvpn@tun0', $lines / 2));
+        }
+        $logs = array_merge($logs, getJournalLogs('vpn-healthcheck', $lines / 4));
+        break;
 }
 
-// Если логи пустые, возвращаем информативное сообщение
-if (empty($logs)) {
-    $logs = [[
-        'time' => date('c'),
-        'unit' => 'system',
-        'message' => "Логи для '$type' пусты или сервис не запущен",
-        'level' => 'info'
-    ]];
-}
+// Сортируем по времени если есть
+usort($logs, function($a, $b) {
+    if (!$a['time'] || !$b['time']) return 0;
+    return strcmp($a['time'], $b['time']);
+});
 
 echo json_encode([
     'type' => $type,
     'count' => count($logs),
-    'logs' => $logs
+    'logs' => array_slice($logs, -$lines)
 ], JSON_UNESCAPED_UNICODE);

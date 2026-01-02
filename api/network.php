@@ -1,6 +1,6 @@
 <?php
 // ==============================================================================
-// MINE SERVER - API сетевой информации
+// MINE SERVER - API сети
 // ==============================================================================
 
 header('Content-Type: application/json');
@@ -8,350 +8,118 @@ header('Content-Type: application/json');
 session_start();
 if (!isset($_SESSION["authenticated"]) || $_SESSION["authenticated"] !== true) {
     http_response_code(401);
-    echo json_encode(['error' => 'Unauthorized']);
-    exit();
+    die(json_encode(['error' => 'Unauthorized']));
 }
 
-/**
- * Получение списка сетевых интерфейсов
- */
-function getNetworkInterfaces() {
-    $interfaces = [];
-    
-    // Читаем из /sys/class/net
-    $netDir = '/sys/class/net';
-    $dirs = scandir($netDir);
-    
-    foreach ($dirs as $iface) {
-        if ($iface === '.' || $iface === '..' || $iface === 'lo') {
-            continue;
-        }
-        
-        $info = [
-            'name' => $iface,
-            'type' => getInterfaceType($iface),
-            'status' => 'down',
-            'mac' => null,
-            'ipv4' => null,
-            'ipv6' => null,
-            'rx_bytes' => 0,
-            'tx_bytes' => 0,
-            'rx_packets' => 0,
-            'tx_packets' => 0,
-            'mtu' => null
-        ];
-        
-        // Статус интерфейса
-        $operstate = @file_get_contents("$netDir/$iface/operstate");
-        if ($operstate !== false) {
-            $info['status'] = trim($operstate) === 'up' ? 'up' : 'down';
-        }
-        
-        // MAC адрес
-        $address = @file_get_contents("$netDir/$iface/address");
-        if ($address !== false) {
-            $info['mac'] = trim($address);
-        }
-        
-        // MTU
-        $mtu = @file_get_contents("$netDir/$iface/mtu");
-        if ($mtu !== false) {
-            $info['mtu'] = (int)trim($mtu);
-        }
-        
-        // Статистика трафика
-        $rxBytes = @file_get_contents("$netDir/$iface/statistics/rx_bytes");
-        $txBytes = @file_get_contents("$netDir/$iface/statistics/tx_bytes");
-        $rxPackets = @file_get_contents("$netDir/$iface/statistics/rx_packets");
-        $txPackets = @file_get_contents("$netDir/$iface/statistics/tx_packets");
-        
-        if ($rxBytes !== false) $info['rx_bytes'] = (int)trim($rxBytes);
-        if ($txBytes !== false) $info['tx_bytes'] = (int)trim($txBytes);
-        if ($rxPackets !== false) $info['rx_packets'] = (int)trim($rxPackets);
-        if ($txPackets !== false) $info['tx_packets'] = (int)trim($txPackets);
-        
-        // Форматированный трафик
-        $info['rx_formatted'] = formatBytes($info['rx_bytes']);
-        $info['tx_formatted'] = formatBytes($info['tx_bytes']);
-        
-        // IP адрес через ip command
-        $ipOutput = shell_exec("ip -4 addr show $iface 2>/dev/null");
-        if (preg_match('/inet (\d+\.\d+\.\d+\.\d+)\/(\d+)/', $ipOutput, $matches)) {
-            $info['ipv4'] = $matches[1];
-            $info['ipv4_mask'] = $matches[2];
-        }
-        
-        $interfaces[] = $info;
-    }
-    
-    return $interfaces;
+$action = $_GET['action'] ?? 'interfaces';
+
+function formatBytes($bytes) {
+    if ($bytes >= 1073741824) return round($bytes / 1073741824, 1) . ' GB';
+    if ($bytes >= 1048576) return round($bytes / 1048576, 1) . ' MB';
+    if ($bytes >= 1024) return round($bytes / 1024, 1) . ' KB';
+    return $bytes . ' B';
 }
 
-/**
- * Определение типа интерфейса
- */
-function getInterfaceType($iface) {
-    if (strpos($iface, 'tun') === 0 || strpos($iface, 'tap') === 0) {
-        return 'vpn';
-    }
-    if (strpos($iface, 'wg') === 0) {
-        return 'wireguard';
-    }
-    if (strpos($iface, 'eth') === 0 || strpos($iface, 'enp') === 0 || strpos($iface, 'ens') === 0) {
-        return 'ethernet';
-    }
-    if (strpos($iface, 'wlan') === 0 || strpos($iface, 'wlp') === 0) {
-        return 'wifi';
-    }
-    if (strpos($iface, 'br') === 0) {
-        return 'bridge';
-    }
-    if (strpos($iface, 'docker') === 0 || strpos($iface, 'veth') === 0) {
-        return 'docker';
-    }
-    if (strpos($iface, 'ppp') === 0) {
-        return 'pppoe';
-    }
-    
-    return 'other';
-}
-
-/**
- * Форматирование байтов
- */
-function formatBytes($bytes, $precision = 2) {
-    $units = ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ'];
-    
-    $bytes = max($bytes, 0);
-    $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
-    $pow = min($pow, count($units) - 1);
-    
-    $bytes /= pow(1024, $pow);
-    
-    return round($bytes, $precision) . ' ' . $units[$pow];
-}
-
-/**
- * Получение внешнего IP
- */
-function getExternalIP($interface = null) {
-    $services = [
-        'https://api.ipify.org',
-        'https://ifconfig.me/ip',
-        'https://icanhazip.com'
-    ];
-    
-    foreach ($services as $service) {
-        $cmd = "curl -s --max-time 5";
-        if ($interface) {
-            $cmd .= " --interface " . escapeshellarg($interface);
-        }
-        $cmd .= " " . escapeshellarg($service) . " 2>/dev/null";
+switch ($action) {
+    case 'interfaces':
+        $interfaces = [];
+        $dir = '/sys/class/net/';
         
-        $ip = trim(shell_exec($cmd));
-        
-        if (filter_var($ip, FILTER_VALIDATE_IP)) {
-            return $ip;
-        }
-    }
-    
-    return null;
-}
-
-/**
- * Получение информации о подключённых устройствах (через ARP)
- */
-function getConnectedDevices() {
-    $devices = [];
-    
-    // Читаем ARP таблицу
-    $arp = shell_exec('arp -an 2>/dev/null');
-    
-    if ($arp) {
-        foreach (explode("\n", trim($arp)) as $line) {
-            // Формат: ? (192.168.1.1) at aa:bb:cc:dd:ee:ff [ether] on eth0
-            if (preg_match('/\((\d+\.\d+\.\d+\.\d+)\) at ([0-9a-f:]+)/i', $line, $matches)) {
-                $ip = $matches[1];
-                $mac = $matches[2];
-                
-                // Пропускаем неполные записи
-                if ($mac === '<incomplete>') {
-                    continue;
-                }
-                
-                $devices[] = [
-                    'ip' => $ip,
-                    'mac' => $mac,
-                    'vendor' => getVendorByMac($mac)
-                ];
+        foreach (scandir($dir) as $name) {
+            if ($name === '.' || $name === '..' || $name === 'lo') continue;
+            
+            $iface = [
+                'name' => $name,
+                'status' => 'down',
+                'mac' => '',
+                'ipv4' => '',
+                'rx' => 0,
+                'tx' => 0,
+                'rx_formatted' => '0 B',
+                'tx_formatted' => '0 B'
+            ];
+            
+            // Статус
+            $operstate = @file_get_contents("$dir$name/operstate");
+            if ($operstate) {
+                $iface['status'] = trim($operstate) === 'up' || trim($operstate) === 'unknown' ? 'up' : 'down';
             }
+            
+            // MAC
+            $address = @file_get_contents("$dir$name/address");
+            if ($address) $iface['mac'] = trim($address);
+            
+            // IP
+            $ipOutput = shell_exec("ip -4 addr show $name 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}/\d+'");
+            if ($ipOutput) $iface['ipv4'] = trim($ipOutput);
+            
+            // Трафик
+            $rx = @file_get_contents("$dir$name/statistics/rx_bytes");
+            $tx = @file_get_contents("$dir$name/statistics/tx_bytes");
+            if ($rx) {
+                $iface['rx'] = (int)$rx;
+                $iface['rx_formatted'] = formatBytes((int)$rx);
+            }
+            if ($tx) {
+                $iface['tx'] = (int)$tx;
+                $iface['tx_formatted'] = formatBytes((int)$tx);
+            }
+            
+            $interfaces[] = $iface;
         }
-    }
-    
-    // Также читаем из DHCP leases (dnsmasq)
-    $leasesFile = '/var/lib/misc/dnsmasq.leases';
-    if (file_exists($leasesFile)) {
-        $leases = file_get_contents($leasesFile);
-        foreach (explode("\n", trim($leases)) as $line) {
-            $parts = preg_split('/\s+/', $line);
-            if (count($parts) >= 4) {
-                $mac = $parts[1];
-                $ip = $parts[2];
-                $hostname = $parts[3] !== '*' ? $parts[3] : null;
-                
-                // Проверяем, не добавлен ли уже
-                $found = false;
-                foreach ($devices as &$device) {
-                    if ($device['ip'] === $ip || $device['mac'] === $mac) {
-                        $device['hostname'] = $hostname;
-                        $device['lease_time'] = (int)$parts[0];
-                        $found = true;
-                        break;
-                    }
-                }
-                
-                if (!$found) {
-                    $devices[] = [
-                        'ip' => $ip,
-                        'mac' => $mac,
-                        'hostname' => $hostname,
-                        'vendor' => getVendorByMac($mac),
-                        'lease_time' => (int)$parts[0]
+        
+        echo json_encode($interfaces);
+        break;
+        
+    case 'devices':
+        $devices = [];
+        $leases_file = '/var/lib/misc/dnsmasq.leases';
+        
+        // Из dnsmasq leases (с hostname)
+        if (file_exists($leases_file)) {
+            $lines = file($leases_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            foreach ($lines as $line) {
+                $parts = preg_split('/\s+/', $line);
+                if (count($parts) >= 4) {
+                    $devices[$parts[1]] = [
+                        'mac' => strtolower($parts[1]),
+                        'ip' => $parts[2],
+                        'hostname' => $parts[3] !== '*' ? $parts[3] : ''
                     ];
                 }
             }
         }
-    }
-    
-    // Сортируем по IP
-    usort($devices, function($a, $b) {
-        return ip2long($a['ip']) - ip2long($b['ip']);
-    });
-    
-    return $devices;
-}
-
-/**
- * Получение производителя по MAC (базовая функция)
- */
-function getVendorByMac($mac) {
-    // Упрощённая база MAC-адресов
-    $vendors = [
-        '00:50:56' => 'VMware',
-        '00:0c:29' => 'VMware',
-        '08:00:27' => 'VirtualBox',
-        'b8:27:eb' => 'Raspberry Pi',
-        'dc:a6:32' => 'Raspberry Pi',
-        'e4:5f:01' => 'Raspberry Pi',
-        '00:1a:79' => 'Mikrotik',
-        '48:8f:5a' => 'Mikrotik',
-        'cc:2d:e0' => 'Mikrotik',
-        '74:4d:28' => 'Mikrotik',
-        '00:e0:4c' => 'Realtek',
-        '52:54:00' => 'QEMU/KVM',
-        '00:15:5d' => 'Hyper-V',
-    ];
-    
-    $prefix = strtolower(substr($mac, 0, 8));
-    
-    return $vendors[$prefix] ?? null;
-}
-
-/**
- * Получение маршрутов
- */
-function getRoutes() {
-    $routes = [];
-    
-    $output = shell_exec('ip route 2>/dev/null');
-    
-    foreach (explode("\n", trim($output)) as $line) {
-        if (empty($line)) continue;
         
-        $routes[] = $line;
-    }
-    
-    return $routes;
-}
-
-/**
- * Проверка статуса VPN
- */
-function getVpnStatus() {
-    $status = [
-        'type' => null,
-        'active' => false,
-        'interface' => 'tun0',
-        'ip' => null,
-        'server' => null,
-        'uptime' => null
-    ];
-    
-    // Проверяем OpenVPN
-    if (file_exists('/etc/openvpn/tun0.conf')) {
-        $status['type'] = 'openvpn';
-        $config = file_get_contents('/etc/openvpn/tun0.conf');
-        if (preg_match('/remote\s+([^\s]+)/', $config, $matches)) {
-            $status['server'] = $matches[1];
-        }
-    }
-    
-    // Проверяем WireGuard
-    if (file_exists('/etc/wireguard/tun0.conf')) {
-        $status['type'] = 'wireguard';
-        $config = file_get_contents('/etc/wireguard/tun0.conf');
-        if (preg_match('/Endpoint\s*=\s*([^:]+)/', $config, $matches)) {
-            $status['server'] = $matches[1];
-        }
-    }
-    
-    // Проверяем активен ли интерфейс
-    $ifconfig = shell_exec('ip link show tun0 2>/dev/null');
-    if ($ifconfig && strpos($ifconfig, 'state UP') !== false) {
-        $status['active'] = true;
+        // Дополняем из ARP
+        $arp = shell_exec('arp -an 2>/dev/null') ?: '';
+        preg_match_all('/\(([0-9.]+)\)\s+at\s+([0-9a-f:]+)/i', $arp, $matches, PREG_SET_ORDER);
         
-        // Получаем IP туннеля
-        $ipOutput = shell_exec('ip -4 addr show tun0 2>/dev/null');
-        if (preg_match('/inet (\d+\.\d+\.\d+\.\d+)/', $ipOutput, $matches)) {
-            $status['ip'] = $matches[1];
+        foreach ($matches as $m) {
+            $mac = strtolower($m[2]);
+            if (!isset($devices[$mac]) && $mac !== '(incomplete)') {
+                $devices[$mac] = [
+                    'mac' => $mac,
+                    'ip' => $m[1],
+                    'hostname' => ''
+                ];
+            }
         }
-    }
-    
-    return $status;
-}
-
-// Обработка запросов
-$action = $_GET['action'] ?? 'all';
-
-switch ($action) {
-    case 'interfaces':
-        echo json_encode(getNetworkInterfaces(), JSON_UNESCAPED_UNICODE);
+        
+        echo json_encode(array_values($devices));
         break;
         
     case 'external_ip':
-        $interface = $_GET['interface'] ?? null;
-        echo json_encode(['ip' => getExternalIP($interface)]);
+        $interface = $_GET['interface'] ?? '';
+        $cmd = 'curl -s --max-time 5 ';
+        if ($interface && preg_match('/^[a-z0-9]+$/i', $interface)) {
+            $cmd .= "--interface $interface ";
+        }
+        $cmd .= 'https://api.ipify.org 2>/dev/null';
+        
+        $ip = trim(shell_exec($cmd) ?: '');
+        echo json_encode(['ip' => $ip ?: null]);
         break;
         
-    case 'devices':
-        echo json_encode(getConnectedDevices(), JSON_UNESCAPED_UNICODE);
-        break;
-        
-    case 'routes':
-        echo json_encode(getRoutes());
-        break;
-        
-    case 'vpn':
-        echo json_encode(getVpnStatus());
-        break;
-        
-    case 'all':
     default:
-        echo json_encode([
-            'interfaces' => getNetworkInterfaces(),
-            'vpn' => getVpnStatus(),
-            'external_ip' => getExternalIP(),
-            'external_ip_vpn' => getExternalIP('tun0'),
-            'devices_count' => count(getConnectedDevices())
-        ], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['error' => 'Unknown action']);
 }
