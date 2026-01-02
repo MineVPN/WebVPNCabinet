@@ -2,24 +2,21 @@
 
 # ==============================================================================
 # MINE SERVER - Скрипт обновления
-# Версия: 5.0
+# Версия: 5.1 (исправления)
 # ==============================================================================
 
 set -e
 
-# Цвета для вывода
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-# Файлы
 VERSION_FILE="/var/www/version"
 SETTINGS_FILE="/var/www/settings"
 LOG_FILE="/var/log/mineserver-update.log"
 
-# Логирование
 log() {
     local level=$1
     shift
@@ -35,7 +32,6 @@ log() {
     esac
 }
 
-# Получение текущей версии
 get_version() {
     if [[ -f "$VERSION_FILE" ]]; then
         cat "$VERSION_FILE"
@@ -44,7 +40,6 @@ get_version() {
     fi
 }
 
-# Установка версии
 set_version() {
     echo "$1" > "$VERSION_FILE"
     chmod 644 "$VERSION_FILE"
@@ -55,31 +50,15 @@ set_version() {
 # МИГРАЦИИ
 # ==============================================================================
 
-# Миграция v1 -> v2
 migrate_v1_to_v2() {
     log INFO "Миграция v1 → v2: Настройка прав и базовых правил"
     
-    # Права на netplan
     chmod 666 /etc/netplan/*.yaml 2>/dev/null || true
     
-    # Установка php-yaml если нет
     if ! dpkg -l | grep -q php-yaml; then
         apt-get update -qq
         apt-get install -y php-yaml >/dev/null 2>&1
     fi
-    
-    # Базовый sudoers
-    cat > /etc/sudoers.d/mineserver << 'SUDOERS'
-www-data ALL=(ALL) NOPASSWD: /bin/systemctl start openvpn@tun0
-www-data ALL=(ALL) NOPASSWD: /bin/systemctl stop openvpn@tun0
-www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart openvpn@tun0
-www-data ALL=(ALL) NOPASSWD: /bin/systemctl start wg-quick@tun0
-www-data ALL=(ALL) NOPASSWD: /bin/systemctl stop wg-quick@tun0
-www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart wg-quick@tun0
-www-data ALL=(ALL) NOPASSWD: /usr/sbin/netplan try
-www-data ALL=(ALL) NOPASSWD: /usr/sbin/netplan apply
-SUDOERS
-    chmod 440 /etc/sudoers.d/mineserver
     
     # MSS clamping
     if ! iptables -t mangle -C FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null; then
@@ -89,180 +68,40 @@ SUDOERS
     set_version "2"
 }
 
-# Миграция v2 -> v3
 migrate_v2_to_v3() {
     log INFO "Миграция v2 → v3: Установка VPN healthcheck"
-    
-    # Создание скрипта healthcheck
-    cat > /usr/local/bin/vpn-healthcheck.sh << 'HEALTHCHECK'
-#!/bin/bash
-SETTINGS_FILE="/var/www/settings"
-
-# Проверяем включен ли мониторинг
-if [[ -f "$SETTINGS_FILE" ]]; then
-    if ! grep -q "vpnchecker=true" "$SETTINGS_FILE"; then
-        exit 0
-    fi
-fi
-
-# Проверяем наличие tun0
-if ! ip link show tun0 &>/dev/null; then
-    echo "$(date): tun0 не найден" >> /var/log/vpn-healthcheck.log
-    
-    if grep -q "autoupvpn=true" "$SETTINGS_FILE" 2>/dev/null; then
-        echo "$(date): Перезапуск VPN..." >> /var/log/vpn-healthcheck.log
-        
-        if [[ -f /etc/wireguard/tun0.conf ]]; then
-            systemctl restart wg-quick@tun0
-        elif [[ -f /etc/openvpn/tun0.conf ]]; then
-            systemctl restart openvpn@tun0
-        fi
-    fi
-    exit 1
-fi
-
-# Проверяем ping через VPN
-if ! ping -c 1 -W 5 -I tun0 8.8.8.8 &>/dev/null; then
-    echo "$(date): Ping через tun0 не проходит" >> /var/log/vpn-healthcheck.log
-    
-    if grep -q "autoupvpn=true" "$SETTINGS_FILE" 2>/dev/null; then
-        echo "$(date): Перезапуск VPN..." >> /var/log/vpn-healthcheck.log
-        
-        if [[ -f /etc/wireguard/tun0.conf ]]; then
-            systemctl restart wg-quick@tun0
-        elif [[ -f /etc/openvpn/tun0.conf ]]; then
-            systemctl restart openvpn@tun0
-        fi
-    fi
-    exit 1
-fi
-
-exit 0
-HEALTHCHECK
-    chmod +x /usr/local/bin/vpn-healthcheck.sh
-    
-    # Systemd service
-    cat > /etc/systemd/system/vpn-healthcheck.service << 'SERVICE'
-[Unit]
-Description=VPN Health Check
-After=network.target
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/vpn-healthcheck.sh
-SERVICE
-    
-    # Systemd timer
-    cat > /etc/systemd/system/vpn-healthcheck.timer << 'TIMER'
-[Unit]
-Description=Run VPN Health Check every 30 seconds
-
-[Timer]
-OnBootSec=60
-OnUnitActiveSec=30
-
-[Install]
-WantedBy=timers.target
-TIMER
     
     # Настройки по умолчанию
     if [[ ! -f "$SETTINGS_FILE" ]]; then
         echo "vpnchecker=true" > "$SETTINGS_FILE"
         echo "autoupvpn=true" >> "$SETTINGS_FILE"
     fi
-    
-    systemctl daemon-reload
-    systemctl enable vpn-healthcheck.timer
-    systemctl start vpn-healthcheck.timer
+    chmod 666 "$SETTINGS_FILE"
     
     set_version "3"
 }
 
-# Миграция v3 -> v4
 migrate_v3_to_v4() {
     log INFO "Миграция v3 → v4: Улучшение healthcheck"
-    
-    # Обновление скрипта с улучшенной обработкой ошибок
-    cat > /usr/local/bin/vpn-healthcheck.sh << 'HEALTHCHECK'
-#!/bin/bash
-set -o pipefail
-
-SETTINGS_FILE="/var/www/settings"
-LOG_FILE="/var/log/vpn-healthcheck.log"
-
-log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S'): $1" >> "$LOG_FILE"
-}
-
-# Проверяем включен ли мониторинг
-if [[ -f "$SETTINGS_FILE" ]]; then
-    if ! grep -q "vpnchecker=true" "$SETTINGS_FILE"; then
-        exit 0
-    fi
-fi
-
-# Проверяем наличие tun0
-if ! ip link show tun0 &>/dev/null; then
-    log "ERROR: tun0 не найден"
-    
-    if grep -q "autoupvpn=true" "$SETTINGS_FILE" 2>/dev/null; then
-        log "Автоматический перезапуск VPN..."
-        
-        if [[ -f /etc/wireguard/tun0.conf ]]; then
-            systemctl restart wg-quick@tun0 2>&1 | tee -a "$LOG_FILE"
-        elif [[ -f /etc/openvpn/tun0.conf ]]; then
-            systemctl restart openvpn@tun0 2>&1 | tee -a "$LOG_FILE"
-        fi
-    fi
-    exit 1
-fi
-
-# Проверяем ping через VPN
-if ! ping -c 1 -W 5 -I tun0 8.8.8.8 &>/dev/null; then
-    log "ERROR: Ping через tun0 не проходит"
-    
-    if grep -q "autoupvpn=true" "$SETTINGS_FILE" 2>/dev/null; then
-        log "Автоматический перезапуск VPN..."
-        
-        if [[ -f /etc/wireguard/tun0.conf ]]; then
-            systemctl restart wg-quick@tun0 2>&1 | tee -a "$LOG_FILE"
-        elif [[ -f /etc/openvpn/tun0.conf ]]; then
-            systemctl restart openvpn@tun0 2>&1 | tee -a "$LOG_FILE"
-        fi
-    fi
-    exit 1
-fi
-
-exit 0
-HEALTHCHECK
-    chmod +x /usr/local/bin/vpn-healthcheck.sh
-    
-    systemctl daemon-reload
-    systemctl restart vpn-healthcheck.timer
-    
     set_version "4"
 }
 
-# Миграция v4 -> v5
 migrate_v4_to_v5() {
-    log INFO "Миграция v4 → v5: Kill Switch + улучшения безопасности"
+    log INFO "Миграция v4 → v5: Kill Switch + безопасность"
     
     # --- ОПРЕДЕЛЕНИЕ ИНТЕРФЕЙСОВ ---
     local WAN_IF=""
     local LAN_IF=""
     
-    # Получаем интерфейсы из netplan
     if [[ -f /etc/netplan/01-mineserver.yaml ]]; then
         WAN_IF=$(grep -A5 "ethernets:" /etc/netplan/01-mineserver.yaml | grep -E "^\s+\w+:" | head -1 | tr -d ' :')
         LAN_IF=$(grep -A5 "ethernets:" /etc/netplan/01-mineserver.yaml | grep -E "^\s+\w+:" | tail -1 | tr -d ' :')
     fi
     
-    # Fallback: определение по маршрутам
     if [[ -z "$WAN_IF" ]]; then
         WAN_IF=$(ip route | grep default | awk '{print $5}' | head -1)
     fi
     
-    # Fallback: все ethernet интерфейсы
     if [[ -z "$LAN_IF" ]]; then
         for iface in $(ls /sys/class/net/ | grep -E '^(eth|enp|ens)'); do
             if [[ "$iface" != "$WAN_IF" ]]; then
@@ -272,53 +111,49 @@ migrate_v4_to_v5() {
         done
     fi
     
-    log INFO "WAN интерфейс: $WAN_IF"
-    log INFO "LAN интерфейс: $LAN_IF"
+    log INFO "WAN: $WAN_IF, LAN: $LAN_IF"
     
     # --- KILL SWITCH ---
-    log INFO "Настройка Kill Switch..."
-    
-    # Сохраняем текущие правила
-    iptables-save > /tmp/iptables-backup-v5.rules
-    
-    # Очищаем FORWARD chain
-    iptables -F FORWARD
-    
-    # Kill Switch: политика DROP по умолчанию для FORWARD
+    iptables-save > /tmp/iptables-backup-v5.rules 2>/dev/null || true
+    iptables -F FORWARD 2>/dev/null || true
     iptables -P FORWARD DROP
     
-    # Разрешаем трафик ТОЛЬКО через VPN туннель
     if [[ -n "$LAN_IF" ]]; then
-        # LAN -> VPN (исходящий)
         iptables -A FORWARD -i "$LAN_IF" -o tun0 -j ACCEPT
-        # VPN -> LAN (входящий, установленные соединения)
         iptables -A FORWARD -i tun0 -o "$LAN_IF" -m state --state RELATED,ESTABLISHED -j ACCEPT
     fi
     
-    # Для случая когда LAN_IF = WAN_IF (один интерфейс)
     if [[ "$LAN_IF" == "$WAN_IF" ]] || [[ -z "$LAN_IF" ]]; then
         iptables -A FORWARD -o tun0 -j ACCEPT
         iptables -A FORWARD -i tun0 -m state --state RELATED,ESTABLISHED -j ACCEPT
     fi
     
-    # NAT через VPN
     iptables -t nat -C POSTROUTING -o tun0 -j MASQUERADE 2>/dev/null || \
         iptables -t nat -A POSTROUTING -o tun0 -j MASQUERADE
     
-    # Сохраняем правила
     if command -v netfilter-persistent &>/dev/null; then
         netfilter-persistent save
     else
-        iptables-save > /etc/iptables/rules.v4 2>/dev/null || \
-        iptables-save > /etc/iptables.rules
+        mkdir -p /etc/iptables
+        iptables-save > /etc/iptables/rules.v4
     fi
     
-    # --- ОБНОВЛЕНИЕ SUDOERS ---
-    log INFO "Обновление sudoers..."
+    set_version "5"
+}
+
+# Миграция v5 -> v5.1 (исправления)
+migrate_v5_to_v51() {
+    log INFO "Миграция v5 → v5.1: Исправления healthcheck, логов, прав"
     
+    # --- ДОБАВЛЯЕМ www-data В ГРУППУ systemd-journal ДЛЯ ЛОГОВ ---
+    log INFO "Настройка прав для просмотра логов..."
+    usermod -aG systemd-journal www-data 2>/dev/null || true
+    usermod -aG adm www-data 2>/dev/null || true
+    
+    # --- ОБНОВЛЯЕМ SUDOERS С JOURNALCTL ---
+    log INFO "Обновление sudoers..."
     cat > /etc/sudoers.d/mineserver << 'SUDOERS'
-# MineServer sudoers rules - v5
-# Только необходимые команды
+# MineServer sudoers rules - v5.1
 
 # VPN управление
 www-data ALL=(ALL) NOPASSWD: /bin/systemctl start openvpn@tun0
@@ -329,6 +164,8 @@ www-data ALL=(ALL) NOPASSWD: /bin/systemctl stop wg-quick@tun0
 www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart wg-quick@tun0
 www-data ALL=(ALL) NOPASSWD: /bin/systemctl enable wg-quick@tun0
 www-data ALL=(ALL) NOPASSWD: /bin/systemctl disable wg-quick@tun0
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl enable openvpn@tun0
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl disable openvpn@tun0
 
 # Сетевые настройки
 www-data ALL=(ALL) NOPASSWD: /usr/sbin/netplan try
@@ -337,54 +174,242 @@ www-data ALL=(ALL) NOPASSWD: /usr/sbin/netplan apply
 # Системные
 www-data ALL=(ALL) NOPASSWD: /bin/systemctl daemon-reload
 www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart dnsmasq
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl reload dnsmasq
 www-data ALL=(ALL) NOPASSWD: /sbin/reboot
-www-data ALL=(root) NOPASSWD: /usr/bin/id
+
+# Логи - ВАЖНО для просмотра журналов
+www-data ALL=(ALL) NOPASSWD: /bin/journalctl *
+www-data ALL=(ALL) NOPASSWD: /usr/bin/journalctl *
+
+# Диагностика
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl is-active *
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl is-enabled *
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl status *
 SUDOERS
     chmod 440 /etc/sudoers.d/mineserver
     
-    # --- ОБНОВЛЕНИЕ СКРИПТА ОБНОВЛЕНИЯ ---
-    log INFO "Обновление launcher..."
+    # --- ИСПРАВЛЕННЫЙ HEALTHCHECK ---
+    log INFO "Установка исправленного VPN healthcheck..."
     
-    cat > /usr/local/bin/mineserver-update.sh << 'LAUNCHER'
+    cat > /usr/local/bin/vpn-healthcheck.sh << 'HEALTHCHECK'
 #!/bin/bash
-cd /var/www/html || exit 1
-git fetch origin 2>/dev/null
-git reset --hard origin/main 2>/dev/null || git reset --hard origin/master 2>/dev/null
-git clean -df 2>/dev/null
-if [[ -f update.sh ]]; then
-    chmod +x update.sh
-    ./update.sh
+# VPN Health Check v5.1 - исправленная версия
+
+SETTINGS_FILE="/var/www/settings"
+LOG_FILE="/var/log/vpn-healthcheck.log"
+LOCK_FILE="/tmp/vpn-healthcheck.lock"
+MAX_LOG_SIZE=1048576  # 1MB
+
+# Функция логирования
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S'): $1" >> "$LOG_FILE"
+    
+    # Ротация лога если больше 1MB
+    if [[ -f "$LOG_FILE" ]] && [[ $(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null) -gt $MAX_LOG_SIZE ]]; then
+        tail -n 1000 "$LOG_FILE" > "$LOG_FILE.tmp"
+        mv "$LOG_FILE.tmp" "$LOG_FILE"
+    fi
+}
+
+# Проверка на уже запущенный процесс
+if [[ -f "$LOCK_FILE" ]]; then
+    pid=$(cat "$LOCK_FILE")
+    if kill -0 "$pid" 2>/dev/null; then
+        exit 0
+    fi
 fi
-LAUNCHER
-    chmod +x /usr/local/bin/mineserver-update.sh
+echo $$ > "$LOCK_FILE"
+trap "rm -f $LOCK_FILE" EXIT
+
+# Читаем настройки
+vpnchecker="true"
+autoupvpn="true"
+
+if [[ -f "$SETTINGS_FILE" ]]; then
+    if grep -q "vpnchecker=false" "$SETTINGS_FILE"; then
+        vpnchecker="false"
+    fi
+    if grep -q "autoupvpn=false" "$SETTINGS_FILE"; then
+        autoupvpn="false"
+    fi
+fi
+
+# Если мониторинг выключен - выходим
+if [[ "$vpnchecker" == "false" ]]; then
+    exit 0
+fi
+
+# Определяем тип VPN
+VPN_TYPE=""
+VPN_SERVICE=""
+
+if [[ -f /etc/wireguard/tun0.conf ]]; then
+    VPN_TYPE="wireguard"
+    VPN_SERVICE="wg-quick@tun0"
+elif [[ -f /etc/openvpn/tun0.conf ]]; then
+    VPN_TYPE="openvpn"
+    VPN_SERVICE="openvpn@tun0"
+else
+    log "WARN: Конфигурация VPN не найдена"
+    exit 0
+fi
+
+# Функция перезапуска VPN
+restart_vpn() {
+    if [[ "$autoupvpn" == "true" ]]; then
+        log "ACTION: Перезапуск $VPN_SERVICE..."
+        
+        # Останавливаем
+        systemctl stop "$VPN_SERVICE" 2>/dev/null
+        sleep 2
+        
+        # Для WireGuard дополнительно очищаем интерфейс
+        if [[ "$VPN_TYPE" == "wireguard" ]]; then
+            ip link delete tun0 2>/dev/null || true
+        fi
+        
+        # Запускаем
+        systemctl start "$VPN_SERVICE" 2>/dev/null
+        
+        # Ждём поднятия
+        sleep 5
+        
+        # Проверяем результат
+        if ip link show tun0 &>/dev/null; then
+            log "SUCCESS: VPN перезапущен успешно"
+            return 0
+        else
+            log "ERROR: VPN не поднялся после перезапуска"
+            return 1
+        fi
+    else
+        log "WARN: Автоперезапуск отключен в настройках"
+        return 1
+    fi
+}
+
+# ПРОВЕРКА 1: Существует ли интерфейс tun0?
+if ! ip link show tun0 &>/dev/null; then
+    log "ERROR: Интерфейс tun0 не существует"
+    restart_vpn
+    exit 1
+fi
+
+# ПРОВЕРКА 2: Интерфейс UP?
+if ! ip link show tun0 | grep -q "state UP\|state UNKNOWN"; then
+    log "ERROR: Интерфейс tun0 не в состоянии UP"
+    restart_vpn
+    exit 1
+fi
+
+# ПРОВЕРКА 3: Есть ли IP на интерфейсе?
+if ! ip addr show tun0 | grep -q "inet "; then
+    log "ERROR: На tun0 нет IP адреса"
+    restart_vpn
+    exit 1
+fi
+
+# ПРОВЕРКА 4: Ping через VPN
+PING_HOSTS="8.8.8.8 1.1.1.1 208.67.222.222"
+PING_SUCCESS=false
+
+for host in $PING_HOSTS; do
+    if ping -c 1 -W 3 -I tun0 "$host" &>/dev/null; then
+        PING_SUCCESS=true
+        break
+    fi
+done
+
+if [[ "$PING_SUCCESS" == "false" ]]; then
+    log "ERROR: Ping через tun0 не проходит ни к одному хосту"
+    restart_vpn
+    exit 1
+fi
+
+# Всё ОК
+exit 0
+HEALTHCHECK
+    chmod +x /usr/local/bin/vpn-healthcheck.sh
     
-    # Обновляем cron
-    (crontab -l 2>/dev/null | grep -v "run-update.sh\|mineserver-update.sh\|update.sh"; \
-     echo "0 4 * * * /usr/local/bin/mineserver-update.sh >> /var/log/mineserver-update.log 2>&1") | crontab -
+    # --- SYSTEMD SERVICE ---
+    cat > /etc/systemd/system/vpn-healthcheck.service << 'SERVICE'
+[Unit]
+Description=VPN Health Check
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/vpn-healthcheck.sh
+TimeoutSec=60
+SERVICE
     
-    # --- ОБНОВЛЕНИЕ HEALTHCHECK ТАЙМЕРА ---
+    # --- SYSTEMD TIMER (каждые 15 секунд для быстрой реакции) ---
     cat > /etc/systemd/system/vpn-healthcheck.timer << 'TIMER'
 [Unit]
-Description=Run VPN Health Check every 30 seconds
+Description=Run VPN Health Check frequently
 
 [Timer]
-OnBootSec=60
-OnUnitActiveSec=30
+OnBootSec=30
+OnUnitActiveSec=15
+AccuracySec=5
 
 [Install]
 WantedBy=timers.target
 TIMER
     
-    systemctl daemon-reload
-    systemctl restart vpn-healthcheck.timer
+    # --- ОБНОВЛЕНИЕ LAUNCHER ---
+    cat > /usr/local/bin/mineserver-update.sh << 'LAUNCHER'
+#!/bin/bash
+set -e
+
+cd /var/www/html || exit 1
+
+# Сохраняем локальные изменения
+git stash 2>/dev/null || true
+
+# Обновляем
+git fetch origin 2>/dev/null
+git reset --hard origin/main 2>/dev/null || git reset --hard origin/master 2>/dev/null
+git clean -df 2>/dev/null
+
+# Удаляем .git чтобы не было проблем
+rm -rf .git 2>/dev/null || true
+
+# Запускаем update.sh если есть
+if [[ -f update.sh ]]; then
+    chmod +x update.sh
+    ./update.sh
+fi
+
+# Перезагружаем Apache для применения изменений PHP
+systemctl reload apache2 2>/dev/null || true
+LAUNCHER
+    chmod +x /usr/local/bin/mineserver-update.sh
     
-    # --- СОЗДАНИЕ ДИРЕКТОРИИ ДЛЯ ДАННЫХ ---
+    # --- СОЗДАНИЕ ДИРЕКТОРИЙ ---
     mkdir -p /var/www/data
     chown www-data:www-data /var/www/data
     chmod 755 /var/www/data
     
-    log INFO "Kill Switch активирован!"
-    set_version "5"
+    mkdir -p /var/log
+    touch /var/log/vpn-healthcheck.log
+    chmod 666 /var/log/vpn-healthcheck.log
+    
+    # --- ПРИМЕНЯЕМ ИЗМЕНЕНИЯ ---
+    systemctl daemon-reload
+    systemctl enable vpn-healthcheck.timer
+    systemctl restart vpn-healthcheck.timer
+    
+    # Перезапуск Apache чтобы применились группы www-data
+    systemctl restart apache2 2>/dev/null || true
+    
+    # Обновляем cron
+    (crontab -l 2>/dev/null | grep -v "run-update.sh\|mineserver-update.sh\|update.sh"; \
+     echo "0 4 * * * /usr/local/bin/mineserver-update.sh >> /var/log/mineserver-update.log 2>&1") | crontab -
+    
+    log INFO "Миграция v5.1 завершена!"
+    set_version "5.1"
 }
 
 # ==============================================================================
@@ -397,21 +422,39 @@ main() {
     current_version=$(get_version)
     log INFO "Текущая версия: $current_version"
     
-    # Последовательное применение миграций
-    if [[ "$current_version" -lt 2 ]]; then
+    # Конвертируем версию в число для сравнения
+    current_num=$(echo "$current_version" | tr -d '.')
+    
+    if [[ "$current_version" == "1" ]] || [[ "$current_num" -lt 2 ]]; then
         migrate_v1_to_v2
     fi
     
-    if [[ "$current_version" -lt 3 ]]; then
+    current_version=$(get_version)
+    current_num=$(echo "$current_version" | tr -d '.')
+    
+    if [[ "$current_num" -lt 3 ]]; then
         migrate_v2_to_v3
     fi
     
-    if [[ "$current_version" -lt 4 ]]; then
+    current_version=$(get_version)
+    current_num=$(echo "$current_version" | tr -d '.')
+    
+    if [[ "$current_num" -lt 4 ]]; then
         migrate_v3_to_v4
     fi
     
-    if [[ "$current_version" -lt 5 ]]; then
+    current_version=$(get_version)
+    current_num=$(echo "$current_version" | tr -d '.')
+    
+    if [[ "$current_num" -lt 5 ]]; then
         migrate_v4_to_v5
+    fi
+    
+    current_version=$(get_version)
+    
+    # v5.1 миграция (всегда применяем если версия 5 или меньше 5.1)
+    if [[ "$current_version" == "5" ]] || [[ "$current_version" < "5.1" ]]; then
+        migrate_v5_to_v51
     fi
     
     final_version=$(get_version)
@@ -419,5 +462,4 @@ main() {
     log INFO "========== Обновление завершено =========="
 }
 
-# Запуск
 main "$@"

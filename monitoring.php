@@ -1,6 +1,6 @@
 <?php
 // ==============================================================================
-// MINE SERVER - Мониторинг системы
+// MINE SERVER - Мониторинг системы (исправленный)
 // ==============================================================================
 
 if (!isset($_SESSION["authenticated"]) || $_SESSION["authenticated"] !== true) {
@@ -10,103 +10,104 @@ if (!isset($_SESSION["authenticated"]) || $_SESSION["authenticated"] !== true) {
 ?>
 
 <!-- Статистика системы -->
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
     
     <!-- CPU -->
     <div class="glassmorphism rounded-xl p-4">
-        <div class="flex items-center justify-between mb-3">
-            <span class="text-slate-400 text-sm">Процессор</span>
-            <svg class="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
-            </svg>
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-slate-400 text-sm">CPU</span>
+            <span class="text-xs text-slate-500" id="cpu-temp">--°C</span>
         </div>
         <div class="text-3xl font-bold text-white mb-2" id="cpu-usage">--%</div>
         <div class="w-full bg-slate-700 rounded-full h-2">
-            <div class="bg-violet-500 h-2 rounded-full transition-all duration-500" id="cpu-bar" style="width: 0%"></div>
+            <div class="bg-violet-500 h-2 rounded-full transition-all duration-300" id="cpu-bar" style="width: 0%"></div>
         </div>
-        <div class="text-xs text-slate-500 mt-2" id="cpu-temp">Температура: --°C</div>
     </div>
     
     <!-- RAM -->
     <div class="glassmorphism rounded-xl p-4">
-        <div class="flex items-center justify-between mb-3">
-            <span class="text-slate-400 text-sm">Память</span>
-            <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-            </svg>
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-slate-400 text-sm">RAM</span>
+            <span class="text-xs text-slate-500" id="ram-detail">--/-- МБ</span>
         </div>
         <div class="text-3xl font-bold text-white mb-2" id="ram-usage">--%</div>
         <div class="w-full bg-slate-700 rounded-full h-2">
-            <div class="bg-green-500 h-2 rounded-full transition-all duration-500" id="ram-bar" style="width: 0%"></div>
+            <div class="bg-green-500 h-2 rounded-full transition-all duration-300" id="ram-bar" style="width: 0%"></div>
         </div>
-        <div class="text-xs text-slate-500 mt-2" id="ram-detail">-- / -- МБ</div>
     </div>
     
     <!-- Disk -->
     <div class="glassmorphism rounded-xl p-4">
-        <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center justify-between mb-2">
             <span class="text-slate-400 text-sm">Диск</span>
-            <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
-            </svg>
+            <span class="text-xs text-slate-500" id="disk-detail">--/-- ГБ</span>
         </div>
         <div class="text-3xl font-bold text-white mb-2" id="disk-usage">--%</div>
         <div class="w-full bg-slate-700 rounded-full h-2">
-            <div class="bg-blue-500 h-2 rounded-full transition-all duration-500" id="disk-bar" style="width: 0%"></div>
+            <div class="bg-blue-500 h-2 rounded-full transition-all duration-300" id="disk-bar" style="width: 0%"></div>
         </div>
-        <div class="text-xs text-slate-500 mt-2" id="disk-detail">-- / -- ГБ</div>
     </div>
     
     <!-- Uptime -->
     <div class="glassmorphism rounded-xl p-4">
-        <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center justify-between mb-2">
             <span class="text-slate-400 text-sm">Uptime</span>
-            <svg class="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
+            <span class="text-xs text-slate-500" id="load-avg">Load: --</span>
         </div>
         <div class="text-3xl font-bold text-white mb-2" id="uptime">--</div>
         <div class="w-full bg-slate-700 rounded-full h-2">
             <div class="bg-orange-500 h-2 rounded-full" style="width: 100%"></div>
         </div>
-        <div class="text-xs text-slate-500 mt-2" id="load-avg">Load: --</div>
     </div>
 </div>
 
-<!-- Графики и подробная информация -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+<!-- VPN статус и пинг -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
     
-    <!-- График пинга -->
+    <!-- Текущий пинг -->
     <div class="glassmorphism rounded-2xl p-6">
         <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-bold text-white">История пинга (VPN)</h3>
+            <h3 class="text-lg font-bold text-white">VPN Ping</h3>
             <div class="flex items-center gap-2">
-                <span class="text-xs text-slate-500" id="ping-stats">Min: -- | Avg: -- | Max: --</span>
+                <div class="w-2 h-2 rounded-full animate-pulse" id="ping-indicator"></div>
+                <span class="text-xs text-slate-500" id="ping-time">--</span>
             </div>
         </div>
-        <div class="h-48 relative">
-            <canvas id="ping-chart"></canvas>
-        </div>
-        <div class="flex justify-between mt-4 text-sm">
-            <div class="text-center">
-                <div class="text-2xl font-bold text-green-400" id="ping-current">--</div>
+        
+        <div class="grid grid-cols-4 gap-4 text-center">
+            <div>
+                <div class="text-3xl font-bold" id="ping-current">--</div>
                 <div class="text-slate-500 text-xs">Текущий</div>
             </div>
-            <div class="text-center">
-                <div class="text-2xl font-bold text-blue-400" id="ping-avg">--</div>
-                <div class="text-slate-500 text-xs">Средний</div>
+            <div>
+                <div class="text-3xl font-bold text-green-400" id="ping-min">--</div>
+                <div class="text-slate-500 text-xs">Мин</div>
             </div>
-            <div class="text-center">
-                <div class="text-2xl font-bold text-red-400" id="ping-loss">--%</div>
-                <div class="text-slate-500 text-xs">Потери</div>
+            <div>
+                <div class="text-3xl font-bold text-blue-400" id="ping-avg">--</div>
+                <div class="text-slate-500 text-xs">Сред</div>
             </div>
+            <div>
+                <div class="text-3xl font-bold text-red-400" id="ping-max">--</div>
+                <div class="text-slate-500 text-xs">Макс</div>
+            </div>
+        </div>
+        
+        <!-- График пинга -->
+        <div class="mt-4 h-24 relative">
+            <canvas id="ping-chart"></canvas>
+        </div>
+        
+        <div class="flex justify-between mt-2 text-xs text-slate-500">
+            <span>Потери: <span id="ping-loss" class="text-white">--%</span></span>
+            <span>Последние 60 сек</span>
         </div>
     </div>
     
     <!-- Сетевые интерфейсы -->
     <div class="glassmorphism rounded-2xl p-6">
-        <h3 class="text-lg font-bold text-white mb-4">Сетевые интерфейсы</h3>
-        <div class="space-y-3" id="interfaces-list">
+        <h3 class="text-lg font-bold text-white mb-4">Интерфейсы</h3>
+        <div class="space-y-2" id="interfaces-list">
             <div class="text-slate-400 text-sm">Загрузка...</div>
         </div>
     </div>
@@ -123,27 +124,24 @@ if (!isset($_SESSION["authenticated"]) || $_SESSION["authenticated"] !== true) {
         </div>
     </div>
     
-    <!-- Подключённые устройства -->
+    <!-- Устройства -->
     <div class="glassmorphism rounded-2xl p-6">
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-bold text-white">Устройства в сети</h3>
-            <button onclick="refreshDevices()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-lg transition">
-                Обновить
-            </button>
+            <span class="text-xs text-slate-500" id="devices-count">0</span>
         </div>
-        <div class="space-y-2 max-h-64 overflow-y-auto" id="devices-list">
+        <div class="space-y-2 max-h-48 overflow-y-auto" id="devices-list">
             <div class="text-slate-400 text-sm">Загрузка...</div>
         </div>
     </div>
 </div>
 
-<!-- Простой canvas-based график (без внешних библиотек) -->
 <script>
-// Данные для графика пинга
+// Данные пинга
 let pingHistory = [];
 const maxPingHistory = 60;
 
-// Инициализация графика
+// Canvas для графика
 const canvas = document.getElementById('ping-chart');
 const ctx = canvas.getContext('2d');
 
@@ -155,53 +153,64 @@ function resizeCanvas() {
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
 
-// Отрисовка графика
+// Отрисовка графика пинга
 function drawPingChart() {
     const width = canvas.width;
     const height = canvas.height;
-    const padding = 10;
     
-    // Очистка
     ctx.clearRect(0, 0, width, height);
     
     if (pingHistory.length < 2) {
         ctx.fillStyle = '#64748b';
-        ctx.font = '14px Inter, sans-serif';
+        ctx.font = '12px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('Сбор данных...', width / 2, height / 2);
         return;
     }
     
-    // Находим min/max для масштабирования
     const values = pingHistory.filter(p => p !== null);
     if (values.length === 0) return;
     
-    const minVal = Math.max(0, Math.min(...values) - 10);
-    const maxVal = Math.max(...values) + 10;
+    const minVal = Math.max(0, Math.min(...values) - 20);
+    const maxVal = Math.max(...values) + 20;
     
-    // Рисуем сетку
-    ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= 4; i++) {
-        const y = padding + (height - padding * 2) * (i / 4);
-        ctx.beginPath();
-        ctx.moveTo(padding, y);
-        ctx.lineTo(width - padding, y);
-        ctx.stroke();
-    }
-    
-    // Рисуем линию
-    ctx.strokeStyle = '#8b5cf6';
-    ctx.lineWidth = 2;
+    // Заливка под графиком
     ctx.beginPath();
+    ctx.moveTo(0, height);
     
     let firstPoint = true;
     for (let i = 0; i < pingHistory.length; i++) {
         const value = pingHistory[i];
+        const x = (width / (maxPingHistory - 1)) * i;
+        
+        if (value === null) {
+            continue;
+        }
+        
+        const y = height - (height * (value - minVal) / (maxVal - minVal));
+        
+        if (firstPoint) {
+            ctx.lineTo(x, y);
+            firstPoint = false;
+        } else {
+            ctx.lineTo(x, y);
+        }
+    }
+    
+    ctx.lineTo(width, height);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(139, 92, 246, 0.1)';
+    ctx.fill();
+    
+    // Линия графика
+    ctx.beginPath();
+    firstPoint = true;
+    for (let i = 0; i < pingHistory.length; i++) {
+        const value = pingHistory[i];
         if (value === null) continue;
         
-        const x = padding + (width - padding * 2) * (i / (maxPingHistory - 1));
-        const y = height - padding - (height - padding * 2) * ((value - minVal) / (maxVal - minVal));
+        const x = (width / (maxPingHistory - 1)) * i;
+        const y = height - (height * (value - minVal) / (maxVal - minVal));
         
         if (firstPoint) {
             ctx.moveTo(x, y);
@@ -210,96 +219,104 @@ function drawPingChart() {
             ctx.lineTo(x, y);
         }
     }
+    ctx.strokeStyle = '#8b5cf6';
+    ctx.lineWidth = 2;
     ctx.stroke();
-    
-    // Заливка под графиком
-    ctx.lineTo(width - padding, height - padding);
-    ctx.lineTo(padding, height - padding);
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(139, 92, 246, 0.1)';
-    ctx.fill();
 }
 
-// Обновление системной статистики
+// Обновление системных метрик (каждую секунду)
 async function updateSystemStats() {
     try {
         const response = await fetch('api/system_stats.php');
         const data = await response.json();
         
         // CPU
-        document.getElementById('cpu-usage').textContent = data.cpu.usage + '%';
-        document.getElementById('cpu-bar').style.width = data.cpu.usage + '%';
-        document.getElementById('cpu-bar').className = 'h-2 rounded-full transition-all duration-500 ' + 
-            (data.cpu.usage > 80 ? 'bg-red-500' : data.cpu.usage > 50 ? 'bg-yellow-500' : 'bg-violet-500');
+        const cpuUsage = data.cpu.usage || 0;
+        document.getElementById('cpu-usage').textContent = cpuUsage + '%';
+        document.getElementById('cpu-bar').style.width = cpuUsage + '%';
+        document.getElementById('cpu-bar').className = 'h-2 rounded-full transition-all duration-300 ' + 
+            (cpuUsage > 80 ? 'bg-red-500' : cpuUsage > 50 ? 'bg-yellow-500' : 'bg-violet-500');
         
-        if (data.cpu.temperature) {
-            document.getElementById('cpu-temp').textContent = 'Температура: ' + data.cpu.temperature + '°C';
+        // Температура
+        if (data.cpu.temperature !== null) {
+            document.getElementById('cpu-temp').textContent = data.cpu.temperature + '°C';
+            document.getElementById('cpu-temp').className = 'text-xs ' + 
+                (data.cpu.temperature > 70 ? 'text-red-400' : data.cpu.temperature > 50 ? 'text-yellow-400' : 'text-slate-500');
+        } else {
+            document.getElementById('cpu-temp').textContent = 'N/A';
         }
         
         // RAM
         document.getElementById('ram-usage').textContent = data.memory.percent + '%';
         document.getElementById('ram-bar').style.width = data.memory.percent + '%';
-        document.getElementById('ram-detail').textContent = data.memory.used + ' / ' + data.memory.total + ' МБ';
+        document.getElementById('ram-detail').textContent = data.memory.used + '/' + data.memory.total + ' МБ';
         
         // Disk
         if (data.disk && data.disk[0]) {
             document.getElementById('disk-usage').textContent = data.disk[0].percent + '%';
             document.getElementById('disk-bar').style.width = data.disk[0].percent + '%';
-            document.getElementById('disk-detail').textContent = data.disk[0].used + ' / ' + data.disk[0].total + ' ГБ';
+            document.getElementById('disk-detail').textContent = data.disk[0].used + '/' + data.disk[0].total + ' ГБ';
         }
         
         // Uptime
         document.getElementById('uptime').textContent = data.uptime.formatted;
-        document.getElementById('load-avg').textContent = 'Load: ' + data.load.load1 + ', ' + data.load.load5 + ', ' + data.load.load15;
+        document.getElementById('load-avg').textContent = 'Load: ' + data.load.load1;
         
     } catch (error) {
-        console.error('Error fetching system stats:', error);
+        console.error('Stats error:', error);
     }
 }
 
-// Обновление пинга
+// Обновление пинга (каждую секунду)
 async function updatePing() {
     try {
         const response = await fetch('api/ping_history.php?action=ping&host=8.8.8.8&interface=tun0');
         const data = await response.json();
         
-        // Добавляем в историю
+        const indicator = document.getElementById('ping-indicator');
+        const currentEl = document.getElementById('ping-current');
+        
         pingHistory.push(data.success ? data.time : null);
         if (pingHistory.length > maxPingHistory) {
             pingHistory.shift();
         }
         
-        // Обновляем текущий пинг
         if (data.success) {
-            document.getElementById('ping-current').textContent = Math.round(data.time) + 'мс';
+            const ping = Math.round(data.time);
+            currentEl.textContent = ping + 'мс';
+            currentEl.className = 'text-3xl font-bold ' + 
+                (ping < 50 ? 'text-green-400' : ping < 100 ? 'text-yellow-400' : 'text-red-400');
+            indicator.className = 'w-2 h-2 rounded-full animate-pulse bg-green-500';
         } else {
-            document.getElementById('ping-current').textContent = 'X';
+            currentEl.textContent = 'X';
+            currentEl.className = 'text-3xl font-bold text-red-400';
+            indicator.className = 'w-2 h-2 rounded-full bg-red-500';
         }
         
-        // Получаем статистику
-        const statsResponse = await fetch('api/ping_history.php?action=history&limit=60');
-        const statsData = await statsResponse.json();
+        document.getElementById('ping-time').textContent = new Date().toLocaleTimeString();
         
-        if (statsData.stats) {
-            document.getElementById('ping-avg').textContent = statsData.stats.avg ? Math.round(statsData.stats.avg) + 'мс' : '--';
-            document.getElementById('ping-loss').textContent = statsData.stats.loss_percent + '%';
-            document.getElementById('ping-stats').textContent = 
-                'Min: ' + (statsData.stats.min || '--') + ' | Avg: ' + (statsData.stats.avg ? Math.round(statsData.stats.avg) : '--') + ' | Max: ' + (statsData.stats.max || '--');
+        // Статистика
+        const statsResponse = await fetch('api/ping_history.php?action=history&limit=60');
+        const stats = await statsResponse.json();
+        
+        if (stats.stats) {
+            document.getElementById('ping-min').textContent = stats.stats.min ? Math.round(stats.stats.min) + 'мс' : '--';
+            document.getElementById('ping-avg').textContent = stats.stats.avg ? Math.round(stats.stats.avg) + 'мс' : '--';
+            document.getElementById('ping-max').textContent = stats.stats.max ? Math.round(stats.stats.max) + 'мс' : '--';
+            document.getElementById('ping-loss').textContent = stats.stats.loss_percent + '%';
         }
         
         drawPingChart();
         
     } catch (error) {
-        console.error('Error fetching ping:', error);
+        console.error('Ping error:', error);
         pingHistory.push(null);
-        if (pingHistory.length > maxPingHistory) {
-            pingHistory.shift();
-        }
+        if (pingHistory.length > maxPingHistory) pingHistory.shift();
         drawPingChart();
     }
 }
 
-// Обновление сетевых интерфейсов
+// Обновление интерфейсов (каждые 5 секунд)
 async function updateInterfaces() {
     try {
         const response = await fetch('api/network.php?action=interfaces');
@@ -310,17 +327,15 @@ async function updateInterfaces() {
         
         interfaces.forEach(iface => {
             const statusColor = iface.status === 'up' ? 'bg-green-500' : 'bg-red-500';
-            const typeIcon = getInterfaceIcon(iface.type);
             
             container.innerHTML += `
                 <div class="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg">
                     <div class="flex items-center gap-3">
                         <div class="w-2 h-2 rounded-full ${statusColor}"></div>
                         <span class="text-white font-mono text-sm">${iface.name}</span>
-                        <span class="text-slate-500 text-xs">${iface.type}</span>
                     </div>
                     <div class="text-right">
-                        <div class="text-slate-300 text-sm">${iface.ipv4 || 'No IP'}</div>
+                        <div class="text-slate-300 text-sm font-mono">${iface.ipv4 || '-'}</div>
                         <div class="text-slate-500 text-xs">↓${iface.rx_formatted} ↑${iface.tx_formatted}</div>
                     </div>
                 </div>
@@ -328,11 +343,11 @@ async function updateInterfaces() {
         });
         
     } catch (error) {
-        console.error('Error fetching interfaces:', error);
+        console.error('Interfaces error:', error);
     }
 }
 
-// Обновление статуса служб
+// Обновление служб (каждые 5 секунд)
 async function updateServices() {
     try {
         const response = await fetch('api/server.php?action=services_status');
@@ -342,83 +357,71 @@ async function updateServices() {
         container.innerHTML = '';
         
         services.forEach(service => {
-            const statusClass = service.active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400';
-            const statusText = service.active ? 'Активна' : 'Остановлена';
+            const statusClass = service.active ? 'bg-green-500' : 'bg-red-500';
+            const statusText = service.active ? 'ON' : 'OFF';
             
             container.innerHTML += `
                 <div class="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg">
                     <span class="text-slate-300 text-sm">${service.name}</span>
-                    <span class="text-xs px-2 py-1 rounded ${statusClass}">${statusText}</span>
+                    <span class="text-xs px-2 py-0.5 rounded ${statusClass}/20 text-${service.active ? 'green' : 'red'}-400">${statusText}</span>
                 </div>
             `;
         });
         
     } catch (error) {
-        console.error('Error fetching services:', error);
+        console.error('Services error:', error);
     }
 }
 
-// Обновление списка устройств
-async function refreshDevices() {
+// Обновление устройств (каждые 10 секунд)
+async function updateDevices() {
     try {
-        const container = document.getElementById('devices-list');
-        container.innerHTML = '<div class="text-slate-400 text-sm">Сканирование...</div>';
-        
         const response = await fetch('api/network.php?action=devices');
         const devices = await response.json();
         
-        container.innerHTML = '';
+        const container = document.getElementById('devices-list');
+        document.getElementById('devices-count').textContent = devices.length + ' устр.';
         
         if (devices.length === 0) {
-            container.innerHTML = '<div class="text-slate-400 text-sm">Устройства не найдены</div>';
+            container.innerHTML = '<div class="text-slate-400 text-sm">Нет устройств</div>';
             return;
         }
         
-        devices.forEach(device => {
+        container.innerHTML = '';
+        devices.slice(0, 10).forEach(device => {
             container.innerHTML += `
                 <div class="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg">
                     <div>
-                        <div class="text-slate-300 text-sm font-mono">${device.ip}</div>
-                        <div class="text-slate-500 text-xs">${device.mac}</div>
-                    </div>
-                    <div class="text-right">
-                        <div class="text-slate-400 text-xs">${device.hostname || ''}</div>
-                        <div class="text-slate-500 text-xs">${device.vendor || ''}</div>
+                        <div class="text-white text-sm font-mono">${device.ip}</div>
+                        <div class="text-slate-500 text-xs">${device.hostname || device.mac}</div>
                     </div>
                 </div>
             `;
         });
         
+        if (devices.length > 10) {
+            container.innerHTML += `<div class="text-slate-500 text-xs text-center">и ещё ${devices.length - 10}...</div>`;
+        }
+        
     } catch (error) {
-        console.error('Error fetching devices:', error);
+        console.error('Devices error:', error);
     }
 }
 
-function getInterfaceIcon(type) {
-    const icons = {
-        'vpn': '🔒',
-        'wireguard': '🔐',
-        'ethernet': '🔌',
-        'wifi': '📶',
-        'bridge': '🌉',
-        'docker': '🐳',
-        'pppoe': '📡'
-    };
-    return icons[type] || '🔗';
-}
-
-// Запуск обновлений
+// Запуск обновлений с разными интервалами
 document.addEventListener('DOMContentLoaded', () => {
+    // Первичная загрузка
     updateSystemStats();
+    updatePing();
     updateInterfaces();
     updateServices();
-    refreshDevices();
-    updatePing();
+    updateDevices();
     
-    // Периодические обновления
-    setInterval(updateSystemStats, 3000);
-    setInterval(updatePing, 2000);
-    setInterval(updateInterfaces, 10000);
-    setInterval(updateServices, 10000);
+    // Интервалы обновления
+    setInterval(updateSystemStats, 1000);  // Каждую секунду
+    setInterval(updatePing, 1000);          // Каждую секунду
+    setInterval(updateInterfaces, 5000);    // Каждые 5 секунд
+    setInterval(updateServices, 5000);      // Каждые 5 секунд
+    setInterval(updateDevices, 10000);      // Каждые 10 секунд
 });
 </script>
