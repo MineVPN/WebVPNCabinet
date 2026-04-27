@@ -121,7 +121,19 @@ if ($netplanFile && function_exists('yaml_parse_file')) {
 //                  failover, auto_start) з'являються в UI протягом 5с після реальної
 //                  події. 304 Not Modified від сервера коли events.log не змінювався —
 //                  реальна мережева вартість мінімальна.
-$statsAssetsVer = '5.5.15';
+//
+// 5.5.15 → 5.5.16: КОСМЕТИКА сторінки Обзор (3 фікси):
+//                  1. Серверні метрики (Задержка, Время работы, Последняя проблема,
+//                     Часы сервера) ВИНЕСЕНО з VPN-hero у окремий блок server-info-card
+//                     між hero і resource-grid. Раніше були в hero — створювало враження
+//                     що метрики стосуються VPN, а вони стосуються СЕРВЕРА.
+//                  2. Resource cards (CPU/RAM/Disk) — фікс overflow при середніх ширинах
+//                     вікна (resource-card-stats з min-width: 110px пхав текст за бордер).
+//                     Тепер min-width: 0 + ellipsis на значеннях.
+//                  3. Sidebar scrollbar приховано (scrollbar-width: none + ::-webkit-scrollbar
+//                     display: none) — меню коротке, скрол не потрібен, а 12px смужка
+//                     візуально псувала вигляд.
+$statsAssetsVer = '5.5.16';
 ?>
 
 <link rel="stylesheet" href="assets/css/pages/stats.css?v=<?php echo $statsAssetsVer; ?>">
@@ -180,67 +192,6 @@ $statsAssetsVer = '5.5.15';
     </div>
     <?php endif; ?>
 
-    <!-- 4 метрики в 2×2 grid справа від hero-info -->
-    <div class="overview-info-grid">
-        <div class="overview-info-item">
-            <span class="overview-info-icon overview-info-icon--cyan">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                </svg>
-            </span>
-            <div class="overview-info-text">
-                <div class="overview-info-label">Задержка</div>
-                <div class="overview-info-value mono" id="overview-ping">—</div>
-                <div class="overview-info-sub">до 8.8.8.8 через tun0</div>
-            </div>
-        </div>
-
-        <div class="overview-info-item">
-            <span class="overview-info-icon overview-info-icon--emerald">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="10"/>
-                    <polyline points="12 6 12 12 16 14"/>
-                </svg>
-            </span>
-            <div class="overview-info-text">
-                <div class="overview-info-label">Время работы</div>
-                <div class="overview-info-value mono" id="overview-uptime">—</div>
-                <div class="overview-info-sub">с момента включения</div>
-            </div>
-        </div>
-
-        <div class="overview-info-item">
-            <span class="overview-info-icon overview-info-icon--amber">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                    <line x1="12" y1="9" x2="12" y2="13"/>
-                    <line x1="12" y1="17" x2="12.01" y2="17"/>
-                </svg>
-            </span>
-            <div class="overview-info-text">
-                <div class="overview-info-label">Последняя проблема</div>
-                <div class="overview-info-value" id="overview-lastproblem">—</div>
-                <div class="overview-info-sub" id="overview-lastproblem-time">—</div>
-            </div>
-        </div>
-
-        <div class="overview-info-item">
-            <span class="overview-info-icon overview-info-icon--violet">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                    <line x1="16" y1="2" x2="16" y2="6"/>
-                    <line x1="8" y1="2" x2="8" y2="6"/>
-                    <line x1="3" y1="10" x2="21" y2="10"/>
-                </svg>
-            </span>
-            <div class="overview-info-text">
-                <div class="overview-info-label">Часы сервера</div>
-                <div class="overview-info-value mono" id="overview-clock">—:—:—</div>
-                <div class="overview-info-sub" id="overview-tz">UTC</div>
-            </div>
-        </div>
-    </div>
-
     <div class="overview-actions">
         <?php if ($activeId && $currentState !== 'stopped'): ?>
             <button type="button" class="btn btn--warning" data-action="restart">
@@ -277,6 +228,66 @@ $statsAssetsVer = '5.5.15';
         <a href="cabinet.php?menu=vpn" class="btn btn--ghost">
             Все конфиги
         </a>
+    </div>
+</div>
+
+<!-- ═══════════════════════ СЕРВЕРНЫЕ МЕТРИКИ (uptime / time / ping / last problem) ═══════════════════════ -->
+<!-- Окремий блок (винесений з VPN-hero у v5.5.16): метрики стосуються СЕРВЕРА, не VPN-туннеля.
+     Раніше були в hero — створювало враження що це VPN-метрики. -->
+<div class="server-info-card">
+    <div class="overview-info-item">
+        <span class="overview-info-icon overview-info-icon--cyan">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+        </span>
+        <div class="overview-info-text">
+            <div class="overview-info-label">Задержка</div>
+            <div class="overview-info-value mono" id="overview-ping">—</div>
+        </div>
+    </div>
+
+    <div class="overview-info-item">
+        <span class="overview-info-icon overview-info-icon--emerald">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+            </svg>
+        </span>
+        <div class="overview-info-text">
+            <div class="overview-info-label">Время работы</div>
+            <div class="overview-info-value mono" id="overview-uptime">—</div>
+        </div>
+    </div>
+
+    <div class="overview-info-item">
+        <span class="overview-info-icon overview-info-icon--amber">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+        </span>
+        <div class="overview-info-text">
+            <div class="overview-info-label">Последняя проблема</div>
+            <div class="overview-info-value" id="overview-lastproblem">—</div>
+            <div class="overview-info-sub" id="overview-lastproblem-time">—</div>
+        </div>
+    </div>
+
+    <div class="overview-info-item">
+        <span class="overview-info-icon overview-info-icon--violet">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                <line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+        </span>
+        <div class="overview-info-text">
+            <div class="overview-info-label">Часы сервера</div>
+            <div class="overview-info-value mono" id="overview-clock">—:—:—</div>
+        </div>
     </div>
 </div>
 

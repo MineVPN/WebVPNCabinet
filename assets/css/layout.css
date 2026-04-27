@@ -128,6 +128,18 @@
     top: var(--space-4);
     height: calc(100vh - var(--space-8));
     overflow-y: auto;
+    /* v5.6.6: приховуємо scrollbar — меню коротке, скрол рідко потрібний, а 12px брендова смужка
+       візуально перекривалася з gradient-бордером. Скрол все ще працює (коліскою/свайпом) — просто без індикатора. */
+    scrollbar-width: none;       /* Firefox */
+    -ms-overflow-style: none;    /* IE/Edge legacy */
+}
+
+/* WebKit (Chrome/Safari/Edge new) — приховуємо scrollbar через власний ::-webkit-scrollbar.
+   В base.css є глобальний ::-webkit-scrollbar { width: 12px } — тут локально переписуємо для sidebar. */
+.sidebar::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
 }
 
 /* ── Блок бренда (логотип + название) ────────────────────────────────── */

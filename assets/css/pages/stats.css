@@ -115,12 +115,12 @@
 .overview-hero {
     position: relative;
     display: grid;
-    grid-template-columns: minmax(260px, 1fr) auto auto;
+    grid-template-columns: minmax(260px, 1fr) auto;
     grid-template-areas:
-        "name    metrics  status"
-        "sub     metrics  ."
-        "badges  metrics  ."
-        "actions metrics  .";
+        "name    status"
+        "sub     ."
+        "badges  ."
+        "actions .";
     column-gap: var(--space-5);
     row-gap: var(--space-1);
     align-items: start;
@@ -141,7 +141,6 @@
             "status"
             "sub"
             "badges"
-            "metrics"
             "actions";
     }
 }
@@ -262,29 +261,46 @@
     letter-spacing: -0.01em;
 }
 
-/* ── Сетка метрик: 2×2 grid в центральній колонці hero (без рамки/фону) ── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   SERVER INFO CARD — серверні метрики (винесені з hero у v5.5.16)
+   Окремий блок між VPN-hero і resource-grid: 4 метрики (задержка ping, uptime,
+   остання проблема, часы сервера). Стиль як у стандартної картки (border-subtle).
+   ═══════════════════════════════════════════════════════════════════════════ */
 
+.server-info-card {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-3) var(--space-5);
+    padding: var(--space-3) var(--space-4);
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xl);
+    margin-bottom: var(--space-3);
+}
+
+@media (max-width: 1023px) {
+    .server-info-card {
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--space-3);
+    }
+}
+
+@media (max-width: 480px) {
+    .server-info-card { grid-template-columns: 1fr; }
+}
+
+/* .overview-info-grid — старий селектор лишився для зворотньої сумісності звязаного коду.
+   Якщо залишився десь в HTML (легасі) — поводиться як server-info-card без рамки (фоллбек). */
 .overview-info-grid {
-    grid-area: metrics;
-    align-self: center;
     display: grid;
     grid-template-columns: repeat(2, auto);
     gap: var(--space-3) var(--space-5);
-    padding: 0;
-    margin: 0;
-    border: none;
 }
 
-/* На вузьких — metrics фул-відтин, повертаємо рамки зверху/знизу (візуальний роздільник) */
 @media (max-width: 1023px) {
     .overview-info-grid {
-        align-self: stretch;
         grid-template-columns: repeat(4, 1fr);
         gap: var(--space-2) var(--space-3);
-        padding: var(--space-2) 0;
-        margin: var(--space-2) 0;
-        border-top: 1px solid var(--border-subtle);
-        border-bottom: 1px solid var(--border-subtle);
     }
 }
 
@@ -538,6 +554,10 @@
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-xl);
     transition: border-color var(--dur-fast) var(--ease);
+    /* min-width: 0 як grid-item — дозволяє картці стискатися нижче intrinsic розміру дітей
+       (без цього grid розтягує все по найширшим вмістом, и "Накопитель" вилазив за край). */
+    min-width: 0;
+    overflow: hidden;
 }
 
 .resource-card:hover {
@@ -624,18 +644,36 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-    flex-shrink: 0;
-    min-width: 110px;
+    /* Раніше було min-width: 110px + flex-shrink: 0 — при вузькій resource-card блок пхав весь
+       вміст за правий край картки ("Накопитель Занято 5.76 ГБ / Свободно 3..." обрізалося).
+       Тепер min-width: 0 дозволяє стискатися, ellipsis на stat-value коректно обрізає. */
+    min-width: 0;
+    flex: 1 1 auto;
 }
 
 .resource-stat-row {
     display: flex;
     justify-content: space-between;
+    gap: var(--space-2);
     font-size: var(--text-xs);
+    min-width: 0;
 }
 
-.resource-stat-label { color: var(--text-muted); }
-.resource-stat-value { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+.resource-stat-label {
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.resource-stat-value {
+    color: var(--text-primary);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    /* ellipsis якщо не вміщається — краще обрізання ніж overflow за межі картки */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
 
 /* ════════════════════════════════════════════════════════════════════════
    SPEED & TRAFFIC cards
