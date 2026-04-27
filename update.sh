@@ -517,27 +517,37 @@ STEOF
     fi
     
     # === 4.5. INPUT chain (rate limit + LAN сервіси) ===
-    # Синхронізація з Installer.sh::configure_firewall — захист панелі і SSH від brute-force flood,
-    # дозвіл DNS і DHCP для LAN-клієнтів. Перевіряємо за наявністю ключового правила (HTTP rate limit
-    # в ланцюжку HTTP) — якщо є, нічого не робимо (ідемпотентно).
+    # Синхронізація з Installer.sh::configure_firewall — захист панелі і SSH від brute-force flood з WAN,
+    # дозвіл DNS і DHCP для LAN-клієнтів, локальний LAN whitelist для SSH без rate-limit.
+    # Перевіряємо за наявністю ключового правила (HTTP rate limit) — якщо є, нічого не робимо (ідемпотентно).
     if ! iptables -C INPUT -p tcp --dport 80 -m state --state NEW -m recent --set --name HTTP 2>/dev/null; then
-        log_step "Налаштування INPUT chain (rate limit HTTP/SSH + LAN сервіси)..."
-        
+        log_step "Налаштування INPUT chain (rate limit HTTP/SSH + LAN whitelist + LAN сервіси)..."
+
         # LAN інтерфейс — беремо спочатку змінну вище (визначена в блоці 4 Kill Switch),
         # фаллбек — за IP 10.10.1.1
         INPUT_LAN_IF="${LAN_IF:-}"
         [ -z "$INPUT_LAN_IF" ] && INPUT_LAN_IF=$(ip -4 addr show 2>/dev/null | grep "10\.10\.1\.1/" | awk '{print $NF}' | head -1)
-        
+
         # loopback завжди дозволяємо (shellinabox 127.0.0.1:4200, інші локальні сервіси)
         iptables -C INPUT -i lo -j ACCEPT 2>/dev/null || iptables -A INPUT -i lo -j ACCEPT
         # Встановлені з'єднання
         iptables -C INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || \
             iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+        # ВАЖЛИВО: LAN whitelist для HTTP/SSH ПЕРЕД rate-limit правилами.
+        # LAN — довірена мережа, тут VS Code Remote SSH, IDE з SSH-плагінами, WinSCP відкривають
+        # 5-10+ паралельних з'єднань. Якщо застосувати rate-limit (>10/60с DROP) до LAN — клієнти
+        # регулярно потрапляють у бан і ssh виглядає "то працює, то ні".
+        if [ -n "$INPUT_LAN_IF" ]; then
+            iptables -A INPUT -i "$INPUT_LAN_IF" -p tcp --dport 22 -j ACCEPT
+            iptables -A INPUT -i "$INPUT_LAN_IF" -p tcp --dport 80 -j ACCEPT
+        fi
+
         # HTTP — rate limit 60/хв (захист від flood)
         iptables -A INPUT -p tcp --dport 80 -m state --state NEW -m recent --set --name HTTP
         iptables -A INPUT -p tcp --dport 80 -m state --state NEW -m recent --update --seconds 60 --hitcount 60 --name HTTP -j DROP
         iptables -A INPUT -p tcp --dport 80 -j ACCEPT
-        # SSH — rate limit 10 підключень/хв (захист від brute force)
+        # SSH — rate limit 10 підключень/хв (захист від brute force ТІЛЬКИ для WAN — LAN whitelisted вище)
         iptables -A INPUT -p tcp --dport 22 -m state --state NEW -m recent --set --name SSH
         iptables -A INPUT -p tcp --dport 22 -m state --state NEW -m recent --update --seconds 60 --hitcount 10 --name SSH -j DROP
         iptables -A INPUT -p tcp --dport 22 -j ACCEPT
@@ -546,11 +556,11 @@ STEOF
             iptables -A INPUT -i "$INPUT_LAN_IF" -p udp --dport 53 -j ACCEPT
             iptables -A INPUT -i "$INPUT_LAN_IF" -p tcp --dport 53 -j ACCEPT
             iptables -A INPUT -i "$INPUT_LAN_IF" -p udp --dport 67 -j ACCEPT
-            log_info "INPUT chain налаштовано (rate limit HTTP/SSH, DNS/DHCP для LAN=$INPUT_LAN_IF)"
+            log_info "INPUT chain налаштовано (LAN whitelist + rate limit HTTP/SSH для WAN, DNS/DHCP для LAN=$INPUT_LAN_IF)"
         else
-            log_warn "INPUT chain налаштовано (rate limit HTTP/SSH), але LAN інтерфейс не визначено — DNS/DHCP для LAN не додано"
+            log_warn "INPUT chain налаштовано (rate limit HTTP/SSH), але LAN інтерфейс не визначено — LAN whitelist і DNS/DHCP не додано"
         fi
-        
+
         iptables-save > /etc/iptables/rules.v4
     fi
     
@@ -712,12 +722,19 @@ EOF
     # Для пользователей с IP-телефонами в LAN: 3 фикса (Conntrack tuning, SIP ALG disable, DHCP lease).
     # Изменения не ломают обычный web/HTTP трафик, только улучшают поведение SIP/UDP.
 
-    # 10.1. Conntrack sysctl — больше размер таблицы + короткие UDP timeouts
-    grep -q "^net.netfilter.nf_conntrack_max" /etc/sysctl.conf || echo "net.netfilter.nf_conntrack_max=262144" >> /etc/sysctl.conf
+    # 10.1. Conntrack sysctl — більший розмір таблиці + короткі UDP timeouts.
+    # 524288 = 512K записів (~160MB RAM), для 400+ LAN пристроїв з VOIP це запас 10x.
+    # Якщо в файлі вже є старе значення 262144 (v5-pre Installer) — оновлюємо до 524288.
+    if grep -qE "^net\.netfilter\.nf_conntrack_max[[:space:]]*=[[:space:]]*262144" /etc/sysctl.conf; then
+        sed -i 's|^net\.netfilter\.nf_conntrack_max[[:space:]]*=.*|net.netfilter.nf_conntrack_max=524288|' /etc/sysctl.conf
+        log_info "Conntrack max оновлено 262144 → 524288 (для 400+ LAN пристроїв)"
+    elif ! grep -q "^net.netfilter.nf_conntrack_max" /etc/sysctl.conf; then
+        echo "net.netfilter.nf_conntrack_max=524288" >> /etc/sysctl.conf
+    fi
     grep -q "^net.netfilter.nf_conntrack_udp_timeout=" /etc/sysctl.conf || echo "net.netfilter.nf_conntrack_udp_timeout=30" >> /etc/sysctl.conf
     grep -q "^net.netfilter.nf_conntrack_udp_timeout_stream" /etc/sysctl.conf || echo "net.netfilter.nf_conntrack_udp_timeout_stream=120" >> /etc/sysctl.conf
     sysctl -p >/dev/null 2>&1
-    log_info "Conntrack sysctl настроены (max=262144, UDP timeout=30/120)"
+    log_info "Conntrack sysctl настроєні (max=524288, UDP timeout=30/120)"
 
     # 10.2. SIP ALG — ядерные модули nf_conntrack_sip + nf_nat_sip «помогают» SIP трафику
     # пройти через NAT, но часто ломают VOIP (фантомные звонки, 1-way audio, проблемы регистрации).
@@ -744,23 +761,43 @@ EOF
         fi
     fi
 
-    # 10.4. dnsmasq.conf — інкрементальне доповнення до конфігурації Installer'а
-    # Додаємо тільки відсутні рядки (не зачіпаємо ручні налаштування юзера,
-    # в т.ч. interface= і dhcp-range= які мають євою системну логіку).
+    # 10.4. dnsmasq.conf — інкрементальне доповнення до конфігурації Installer'а.
+    # Додаємо/оновлюємо ліміти для 400+ LAN пристроїв (default dns-forward-max=150,
+    # dhcp-lease-max=1000 — замало). Не зачіпаємо ручні налаштування юзера
+    # (interface=, dhcp-range= лишаємо як є — в них євова системна логіка).
     if [ -f /etc/dnsmasq.conf ]; then
         dnsmasq_changed=0
+
+        # Прості ключі без значення — додаємо якщо немає
         grep -qF "dhcp-authoritative" /etc/dnsmasq.conf || { echo "dhcp-authoritative" >> /etc/dnsmasq.conf; dnsmasq_changed=1; }
         grep -qF "domain=minevpn.lan" /etc/dnsmasq.conf || { echo "domain=minevpn.lan" >> /etc/dnsmasq.conf; dnsmasq_changed=1; }
         grep -qF "bind-interfaces" /etc/dnsmasq.conf || { echo "bind-interfaces" >> /etc/dnsmasq.conf; dnsmasq_changed=1; }
-        grep -qF "cache-size=10000" /etc/dnsmasq.conf || { echo "cache-size=10000" >> /etc/dnsmasq.conf; dnsmasq_changed=1; }
         grep -qF "server=1.1.1.1" /etc/dnsmasq.conf || { echo "server=1.1.1.1" >> /etc/dnsmasq.conf; dnsmasq_changed=1; }
         grep -qF "server=8.8.8.8" /etc/dnsmasq.conf || { echo "server=8.8.8.8" >> /etc/dnsmasq.conf; dnsmasq_changed=1; }
+
+        # Ліміти для 400+ пристроїв — оновлюємо значення якщо вже є зі старим, додаємо якщо нема.
+        # cache-size: 10000 (старий v5 default) → 50000 (для 400 пристроїв).
+        for setting in "cache-size=50000" "dns-forward-max=8192" "dhcp-lease-max=2000" "min-cache-ttl=60" "neg-ttl=60"; do
+            key="${setting%%=*}"
+            if grep -qE "^${key}=" /etc/dnsmasq.conf; then
+                # Ключ є — оновлюємо тільки якщо значення відрізняється
+                current=$(grep -E "^${key}=" /etc/dnsmasq.conf | head -1)
+                if [ "$current" != "$setting" ]; then
+                    sed -i "s|^${key}=.*|${setting}|" /etc/dnsmasq.conf
+                    dnsmasq_changed=1
+                fi
+            else
+                echo "${setting}" >> /etc/dnsmasq.conf
+                dnsmasq_changed=1
+            fi
+        done
+
         if [ "$dnsmasq_changed" = "1" ]; then
             if systemctl is-active --quiet dnsmasq 2>/dev/null; then
-                systemctl restart dnsmasq 2>/dev/null && log_info "dnsmasq.conf доповнено + перезапущено" \
-                    || log_warn "dnsmasq.conf доповнено, але dnsmasq не перезапустився"
+                systemctl restart dnsmasq 2>/dev/null && log_info "dnsmasq.conf оновлено (ліміти 400+ пристроїв) + перезапущено" \
+                    || log_warn "dnsmasq.conf оновлено, але dnsmasq не перезапустився"
             else
-                log_info "dnsmasq.conf доповнено (dnsmasq неактивний)"
+                log_info "dnsmasq.conf оновлено (ліміти 400+ пристроїв, dnsmasq неактивний)"
             fi
         fi
     fi
@@ -781,6 +818,39 @@ EOF
             log_info "SSH PermitRootLogin yes (виставлено)"
         fi
     fi
+
+    # 10.6. PAM faillock — м'які ліміти (синхронно з Installer.sh::configure_pam).
+    # Default deny=3 + unlock_time=600 = одна помилка пароля → 10хв бан. Для довіреної LAN це шкідливо.
+    # 2 рівні захисту: faillock.conf м'які + прибираємо pam_faillock з /etc/pam.d/* якщо активний.
+    if [ -f /etc/security/faillock.conf ]; then
+        [ ! -f /etc/security/faillock.conf.minevpn-backup ] && \
+            cp /etc/security/faillock.conf /etc/security/faillock.conf.minevpn-backup
+        faillock_changed=0
+        for setting in "deny=30" "unlock_time=60" "fail_interval=900"; do
+            key="${setting%%=*}"
+            current=$(grep -E "^[#[:space:]]*${key}[[:space:]]*=" /etc/security/faillock.conf | head -1 | tr -d ' ')
+            expected=$(echo "$setting" | tr -d ' ')
+            if [ "$current" != "$expected" ]; then
+                if grep -qE "^[#[:space:]]*${key}[[:space:]]*=" /etc/security/faillock.conf; then
+                    sed -i "s|^[#[:space:]]*${key}[[:space:]]*=.*|${setting}|" /etc/security/faillock.conf
+                else
+                    echo "${setting}" >> /etc/security/faillock.conf
+                fi
+                faillock_changed=1
+            fi
+        done
+        [ "$faillock_changed" = "1" ] && log_info "/etc/security/faillock.conf: deny=30, unlock_time=60, fail_interval=900"
+    fi
+    # Закоментовуємо pam_faillock у /etc/pam.d/* якщо активний
+    pam_disabled=0
+    for pam_file in /etc/pam.d/common-auth /etc/pam.d/common-account /etc/pam.d/sshd; do
+        [ -f "$pam_file" ] || continue
+        if grep -qE "^[[:space:]]*[^#].*pam_faillock\.so" "$pam_file"; then
+            sed -i 's|^\([[:space:]]*[^#].*pam_faillock\.so.*\)|# MineVPN disabled: \1|' "$pam_file"
+            pam_disabled=1
+        fi
+    done
+    [ "$pam_disabled" = "1" ] && log_info "PAM faillock закоментовано у /etc/pam.d/* (LAN-friendly)"
 
     log_info "Миграция v5 завершена"
 fi
