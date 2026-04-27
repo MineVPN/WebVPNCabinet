@@ -133,7 +133,28 @@ if ($netplanFile && function_exists('yaml_parse_file')) {
 //                  3. Sidebar scrollbar приховано (scrollbar-width: none + ::-webkit-scrollbar
 //                     display: none) — меню коротке, скрол не потрібен, а 12px смужка
 //                     візуально псувала вигляд.
-$statsAssetsVer = '5.5.16';
+//
+// 5.5.16 → 5.5.17: Resource cards (CPU/RAM/Disk) — переведено з flex-row на grid-template-areas.
+//                  Причина: на середніх вікнах (~1100-1200px) info і stats обидва flex:1
+//                  розділяли вузький простір рівно пополам, тексти "Процессор (CPU)" і "Ядра 2 ядра"
+//                  наїжджали один на одного. Тепер grid-areas: info+ring вверху, stats повним рядком
+//                  внизу. Гарантовано без overlap. На широких вікнах (≥1280px) — повертаємо horizontal
+//                  layout (info | stats | ring як раніше).
+//
+// 5.5.17 → 5.5.18: 1-РАДКОВИЙ VPN-HERO. Переведено з grid-template-areas на flex з order.
+//                  Раніше hero мав 3 видимі рядки (name+status / sub / actions) — ~120px висоти.
+//                  Тепер все в один компактний ряд:
+//                  [Double] [WireGuard · 188.137.229.213] [Перезапустить] [Остановить] [Все конфиги] ←→ [Подключено]
+//                  ~50-60px замість 120px — економія ~50% вертикалі при тій ж функціональності.
+//                  На mobile (≤1023px) — зберігається старий column-layout (5 рядків).
+//
+// 5.5.18 → 5.5.19: ПЕРЕДИЗАЙН hero-блока. Показуємо протокол яскравим акцентом
+//                  з іконкою (shield+zap для WG, shield-check для OpenVPN), ім'я конфіга
+//                  звичайним шрифтом (було weight 800 → стало 600), адресу в дужках.
+//                  Новий порядок: [🛡 WireGuard]  Double (188.137.229.213)  [кнопки]  ←→  [Подключено]
+//                  HTML structure змінена: overview-hero-top ліквідовано, overview-hero-sub ліквідовано,
+//                  додано overview-protocol (pill з іконкою) і overview-config-line (name + (server)).
+$statsAssetsVer = '5.5.19';
 ?>
 
 <link rel="stylesheet" href="assets/css/pages/stats.css?v=<?php echo $statsAssetsVer; ?>">
@@ -150,35 +171,54 @@ $statsAssetsVer = '5.5.16';
 <!-- ═══════════════════════ HERO: быстрый обзор VPN ═══════════════════════ -->
 <div class="<?php echo $heroClass; ?>">
 
-    <div class="overview-hero-top">
-        <div class="overview-config-name" title="<?php echo htmlspecialchars($activeConfig['name'] ?? ''); ?>">
-            <?php echo htmlspecialchars($activeConfig['name'] ?? '— конфиг не выбран —'); ?>
+    <?php if ($activeConfig): ?>
+        <!-- 1. Протокол з іконкою (яскравий акцент — violet для WireGuard, amber для OpenVPN) -->
+        <div class="overview-protocol overview-protocol--<?php echo $activeConfig['type'] === 'wireguard' ? 'wg' : 'ovpn'; ?>">
+            <?php if ($activeConfig['type'] === 'wireguard'): ?>
+                <!-- WireGuard: shield + zap (швидкий + захист) -->
+                <svg class="overview-protocol-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    <polyline points="13 8 9 14 12 14 11 18 15 12 12 12 13 8"/>
+                </svg>
+            <?php else: ?>
+                <!-- OpenVPN: shield-check (надійний) -->
+                <svg class="overview-protocol-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    <polyline points="9 12 11 14 15 10"/>
+                </svg>
+            <?php endif; ?>
+            <span class="overview-protocol-name"><?php echo $activeConfig['type'] === 'wireguard' ? 'WireGuard' : 'OpenVPN'; ?></span>
         </div>
 
-        <div class="overview-status">
-            <span class="overview-status-dot"></span>
-            <span>
-                <?php
-                if ($currentState === 'stopped')         echo 'Остановлен';
-                elseif ($isConnected)                     echo 'Подключено';
-                elseif ($currentState === 'recovering')   echo 'Восстановление';
-                elseif ($currentState === 'restarting')   echo 'Перезапуск';
-                else                                      echo 'Нет связи';
-                ?>
+        <!-- 2. Ім'я конфіга звичайним шрифтом + адреса в дужках -->
+        <div class="overview-config-line">
+            <span class="overview-config-name" title="<?php echo htmlspecialchars($activeConfig['name']); ?>">
+                <?php echo htmlspecialchars($activeConfig['name']); ?>
             </span>
+            <?php if (!empty($activeConfig['server'])): ?>
+                <span class="overview-config-server">(<?php echo htmlspecialchars($activeConfig['server']); ?><?php if (!empty($activeConfig['port'])): ?>:<?php echo htmlspecialchars($activeConfig['port']); ?><?php endif; ?>)</span>
+            <?php endif; ?>
         </div>
-    </div>
+    <?php else: ?>
+        <!-- Немає активного конфіга — спорожняємо протокольний pill, показуємо промпт в config-line -->
+        <div class="overview-config-line">
+            <span class="overview-config-name">— конфиг не выбран —</span>
+            <span class="overview-config-server">Откройте раздел VPN для загрузки</span>
+        </div>
+    <?php endif; ?>
 
-    <div class="overview-hero-sub">
-        <?php if ($activeConfig): ?>
-            <span class="<?php echo $activeConfig['type'] === 'wireguard' ? 'text-violet' : 'text-amber'; ?>">
-                <?php echo $activeConfig['type'] === 'wireguard' ? 'WireGuard' : 'OpenVPN'; ?>
-            </span>
-            <span class="dot-sep">·</span>
-            <span class="overview-hero-server"><?php echo htmlspecialchars($activeConfig['server'] ?? ''); ?><?php if (!empty($activeConfig['port'])): ?>:<?php echo htmlspecialchars($activeConfig['port']); ?><?php endif; ?></span>
-        <?php else: ?>
-            <span>Откройте раздел VPN для загрузки конфига</span>
-        <?php endif; ?>
+    <!-- 3. Status pill (справа) -->
+    <div class="overview-status">
+        <span class="overview-status-dot"></span>
+        <span>
+            <?php
+            if ($currentState === 'stopped')         echo 'Остановлен';
+            elseif ($isConnected)                     echo 'Подключено';
+            elseif ($currentState === 'recovering')   echo 'Восстановление';
+            elseif ($currentState === 'restarting')   echo 'Перезапуск';
+            else                                      echo 'Нет связи';
+            ?>
+        </span>
     </div>
 
     <?php if ($activatedByFailover): ?>

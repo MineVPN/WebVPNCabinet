@@ -112,18 +112,16 @@
    HERO-БЛОК ОБЗОРА VPN
    ════════════════════════════════════════════════════════════════════════ */
 
+/* v5.5.18: 1-радковий hero — переведено з grid-template-areas на flex з order.
+   Раніше hero мав 3 рядки (name+status / sub / actions) — ~120px висоти.
+   Тепер все в один ряд: [Double] [WireGuard · 188.137.229.213] [кнопки] ←→ [Подключено]
+   ~50-60px замість 120px — економія ~50% вертикалі при тій ж функціональності. */
 .overview-hero {
     position: relative;
-    display: grid;
-    grid-template-columns: minmax(260px, 1fr) auto;
-    grid-template-areas:
-        "name    status"
-        "sub     ."
-        "badges  ."
-        "actions .";
-    column-gap: var(--space-5);
-    row-gap: var(--space-1);
-    align-items: start;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-3);
     padding: var(--space-3) var(--space-4);
     background: var(--surface-1);
     border: 2px solid var(--border-strong);
@@ -132,17 +130,20 @@
     overflow: hidden;
 }
 
-/* На вузьких екранах — 1 колонка, все вертикально */
+/* На вузьких екранах — column з порядком як раніше у grid: name → status → sub → badges → actions */
 @media (max-width: 1023px) {
     .overview-hero {
-        grid-template-columns: 1fr;
-        grid-template-areas:
-            "name"
-            "status"
-            "sub"
-            "badges"
-            "actions";
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--space-2);
     }
+    /* На mobile status йде ДРУГИМ (після protocol+name) — як раніше у grid-template-areas */
+    .overview-protocol    { order: 1; align-self: flex-start; }
+    .overview-config-line { order: 2; }
+    .overview-status      { order: 3; margin-left: 0 !important; align-self: flex-start; }
+    .overview-hero-sub    { order: 4; margin: 0; }
+    .overview-badges      { order: 5; flex-basis: auto !important; margin: 0; }
+    .overview-actions     { order: 6; margin: 0; }
 }
 
 /* Розгортаємо .overview-hero-top — його children (config-name + status)
@@ -169,12 +170,67 @@
     border-color: var(--border-strong);
 }
 
-/* ── Верхняя строка: название конфига слева, статус pill справа ── */
+/* ── Верхняя строка: протокол → имя конфига+адрес → статус pill справа ── */
 
+/* v5.5.19: Протокольний pill з іконкою (яскравий акцент на тип VPN).
+   Раніше був просто текст "WireGuard" violet-ом разом з IP. Тепер виокремлений як pill з іконкою
+   shield+zap (WG) / shield-check (OpenVPN) і легким кольоровим фоном — візуальна идентифікація типу. */
+.overview-protocol {
+    order: 1;                /* перший зліва (видимість типу важливіша за ім'я) */
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 6px 14px;
+    border-radius: var(--radius-full);
+    border: 1.5px solid;
+    font-size: var(--text-md);   /* більше ніж раніше (було text-sm як inline-свип) */
+    font-weight: 700;
+    flex-shrink: 0;
+    letter-spacing: -0.01em;
+}
+
+.overview-protocol-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.overview-protocol-name {
+    line-height: 1;
+}
+
+/* WireGuard — violet акцент (брендовий колір самого WG — #88171A, але ми в violet-палітрі panel) */
+.overview-protocol--wg {
+    background: var(--violet-soft);
+    color: #C4B5FD;
+    border-color: var(--violet);
+}
+
+/* OpenVPN — amber акцент (є візуальний контраст між WG/OVPN) */
+.overview-protocol--ovpn {
+    background: var(--amber-soft);
+    color: #FCD34D;
+    border-color: var(--amber);
+}
+
+/* В hero--connected протокольний pill залишає власний колір (не треба override) */
+
+/* Ім'я конфіга + адреса в дужках (об'єднані в одному inline-блоці) */
+.overview-config-line {
+    order: 2;                /* після протоколу */
+    display: flex;
+    align-items: baseline;   /* baseline бо назва більший розмір ніж (server) — ряд вирівнюється по нижній лінії букв */
+    gap: var(--space-2);
+    min-width: 0;
+    flex-shrink: 1;
+    flex-wrap: nowrap;
+}
+
+/* Ім'я конфіга — звичайним шрифтом (було weight 800/extrabold → стало 600/semibold).
+   Назва лишається читабельною але не «кричить» — головний акцент тепер на протокольному pill. */
 .overview-config-name {
-    grid-area: name;
     font-size: var(--text-lg);
-    font-weight: 800;
+    font-weight: 600;            /* v5.5.19: 800 → 600, звичайний */
     color: var(--text-primary);
     letter-spacing: var(--tracking-tight);
     line-height: 1.1;
@@ -182,11 +238,26 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     min-width: 0;
+    max-width: 220px;
+    flex-shrink: 1;
 }
 
+/* Адреса в дужках — mono, muted (вторинна інформація) */
+.overview-config-server {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* ── Status pill (справа) ── */
+
 .overview-status {
-    grid-area: status;
-    align-self: start;
+    order: 99;               /* в кінець (справа) */
+    margin-left: auto;       /* посуває в правий край flex-row */
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
@@ -237,15 +308,16 @@
    конфига (38px primary). Но именно адрес — это фактическая идентификация сервера,
    к которому подключен юзер. Повышаем видимость до равноценной с именем. */
 .overview-hero-sub {
-    grid-area: sub;
+    order: 2;                /* після name: "WireGuard · 188.137.229.213" */
     font-size: var(--text-sm);
     color: var(--text-secondary);
-    margin-bottom: var(--space-2);
     font-weight: 600;
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+    /* margin: 0 — бо в одному рядку з іншими елементами */
 }
 
 .overview-hero-sub .dot-sep {
@@ -381,23 +453,25 @@
 }
 
 .overview-actions {
-    grid-area: actions;
+    order: 4;                /* після sub (2) і badges (3): кнопки Перезапустить / Остановить / Все конфиги */
     display: flex;
     gap: var(--space-2);
     flex-wrap: wrap;
-    margin-top: var(--space-2);
+    flex-shrink: 0;
+    /* margin: 0 — бо в одному рядку з name+sub */
 }
 
 .overview-actions .btn {
-    min-width: 140px;
+    min-width: 0;            /* було 140px — для 1-row достатньо інтринсичної ширини (кнопки компактніші) */
 }
 
 .overview-badges {
-    grid-area: badges;
+    order: 3;                /* перед actions, після sub */
+    flex-basis: 100%;        /* failover-бейдж (рідкісний) переходить на новий рядок — щоб не ламати 1-row layout */
     display: flex;
     gap: var(--space-2);
     flex-wrap: wrap;
-    margin-bottom: var(--space-2);
+    margin: 0;
 }
 
 /* Скрытый блок для stats.js — он пишет в старые id, а MutationObserver-ы
@@ -543,34 +617,42 @@
    PROGRESS RING (CPU / RAM / Disk)
    ════════════════════════════════════════════════════════════════════════ */
 
+/* v5.5.17: переводимо .resource-card з flex на grid з grid-template-areas — основна причина:
+   при середніх ширинах вікна (~1100-1200px) flex з трьома children (info + stats + ring)
+   ламався — info і stats обидва flex:1 розділяли вузький простір рівно пополам, тексти
+   "Процессор (CPU)" і "Ядра 2 ядра" наїжджали один на одного.
+   Grid-areas: info+ring вверху, stats повним рядком внизу. Гарантовано без overlap на будь-якій ширині.
+   На широких вікнах (≥1280px) — переходимо на horizontal layout (як раніше: info | stats | ring). */
 .resource-card {
     position: relative;
-    display: flex;
-    flex-direction: row;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+        "info  ring"
+        "stats stats";
     align-items: center;
-    gap: var(--space-4);
+    gap: var(--space-2) var(--space-3);
     padding: var(--space-3) var(--space-4);
     background: var(--surface-1);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-xl);
     transition: border-color var(--dur-fast) var(--ease);
     /* min-width: 0 як grid-item — дозволяє картці стискатися нижче intrinsic розміру дітей
-       (без цього grid розтягує все по найширшим вмістом, и "Накопитель" вилазив за край). */
+       (без цього parent grid розтягує все по найширшим вмістом). */
     min-width: 0;
-    overflow: hidden;
 }
 
 .resource-card:hover {
     border-color: var(--border-strong);
 }
 
+/* .resource-card-header ї display: contents — його діти (info, ring) піднімаються як прямі grid-items батька .resource-card */
 .resource-card-header {
     display: contents;
 }
 
 .resource-card-info {
-    order: 1;
-    flex: 1;
+    grid-area: info;
     min-width: 0;
     display: flex;
     flex-direction: column;
@@ -594,10 +676,11 @@
 
 .progress-ring {
     position: relative;
-    order: 3;
+    grid-area: ring;
     width: 48px;
     height: 48px;
     flex-shrink: 0;
+    align-self: center;
 }
 
 .progress-ring svg {
@@ -640,15 +723,22 @@
 }
 
 .resource-card-stats {
-    order: 2;
+    grid-area: stats;
     display: flex;
     flex-direction: column;
     gap: 2px;
-    /* Раніше було min-width: 110px + flex-shrink: 0 — при вузькій resource-card блок пхав весь
-       вміст за правий край картки ("Накопитель Занято 5.76 ГБ / Свободно 3..." обрізалося).
-       Тепер min-width: 0 дозволяє стискатися, ellipsis на stat-value коректно обрізає. */
     min-width: 0;
-    flex: 1 1 auto;
+    /* На середніх вікнах stats завжди на окремому рядку (внизу) — не наїжджає на info.
+       На широких (≥1280px) — в row як раніше (див. media-query нижче). */
+}
+
+/* На широких вікнах — все в одному рядку (info | stats | ring), як було раніше */
+@media (min-width: 1280px) {
+    .resource-card {
+        grid-template-columns: 1fr auto auto;
+        grid-template-areas: "info stats ring";
+        gap: var(--space-4);
+    }
 }
 
 .resource-stat-row {
@@ -998,13 +1088,20 @@
 
     .overview-config-name {
         font-size: var(--text-xl);
+        max-width: none;     /* на mobile назва займає весь рядок — без обмеження */
+    }
+
+    /* v5.5.19: На mobile протокол і config-line окремими рядками (column flex у hero вже робить це).
+       Config-line всередині wrap бо "ім'я (дуже довгий IP)" може не вміститись на вузькому екрані. */
+    .overview-config-line {
+        flex-wrap: wrap;
     }
 
     .overview-status {
         padding: 6px 12px;
         font-size: var(--text-sm);
         gap: var(--space-2);
-        justify-self: start;
+        /* margin-left: 0 вже виставлене в @media (max-width: 1023px) */
     }
 
     .overview-status-dot {
@@ -1103,20 +1200,11 @@
         font-size: var(--text-lg);
     }
 
-    /* ─ Resource cards (CPU/RAM/Disk) — на мобильном возвращаем column layout ─ */
+    /* ─ Resource cards (CPU/RAM/Disk) на мобільному ─
+       Структура grid-areas вже правильна (info+ring зверху, stats внизу) — тільки тюнинг. */
     .resource-card {
-        flex-direction: column;
-        align-items: stretch;
         gap: var(--space-2);
         padding: var(--space-3) var(--space-4);
-    }
-
-    .resource-card-header {
-        margin-bottom: 0;
-    }
-
-    .resource-card-stats {
-        min-width: 0;
     }
 
     .resource-card-value {

@@ -91,6 +91,10 @@
 
 .app {
     display: flex;
+    /* v5.6.8: align-items: stretch (default) — сидбар розтягується на повну висоту main
+       (раніше в v5.6.7 було flex-start — сидбар був висотою по своєму контенту).
+       min-height: 100vh гарантує що сторінка займає мінімум повний viewport навіть на коротких сторінках —
+       отже сидбар завжди мінімум на весь viewport. На довгих сторінках обидва блоки розтягуються разом рівної висоти. */
     min-height: 100vh;
 }
 
@@ -124,22 +128,11 @@
     /* v5.6.3: компактне padding (одна ступень space менше) */
     padding: var(--space-5) var(--space-4);
     margin: var(--space-3) 0 var(--space-3) var(--space-3);
-    position: sticky;
-    top: var(--space-4);
-    height: calc(100vh - var(--space-8));
-    overflow-y: auto;
-    /* v5.6.6: приховуємо scrollbar — меню коротке, скрол рідко потрібний, а 12px брендова смужка
-       візуально перекривалася з gradient-бордером. Скрол все ще працює (коліскою/свайпом) — просто без індикатора. */
-    scrollbar-width: none;       /* Firefox */
-    -ms-overflow-style: none;    /* IE/Edge legacy */
-}
-
-/* WebKit (Chrome/Safari/Edge new) — приховуємо scrollbar через власний ::-webkit-scrollbar.
-   В base.css є глобальний ::-webkit-scrollbar { width: 12px } — тут локально переписуємо для sidebar. */
-.sidebar::-webkit-scrollbar {
-    display: none;
-    width: 0;
-    height: 0;
+    /* v5.6.7: ПРИБРАНО position: sticky + overflow-y: auto + height: calc(...) + scrollbar styles.
+       Раніше sidebar був sticky з власним скролом (height: 100vh - space-8 + overflow-y: auto)
+       — це давало окремий 12px scrollbar який перекривався з gradient-бордером. Також було два окремих скроли:
+       сидбару і окремо main — незручно. Тепер сидбар — звичайний flex-item, скролиться разом з main
+       через єдиний body scrollbar (стандартний брендовий з base.css). */
 }
 
 /* ── Блок бренда (логотип + название) ────────────────────────────────── */
@@ -402,8 +395,6 @@
 
     .sidebar {
         width: auto;
-        height: auto;
-        position: static;
         padding: var(--space-4) var(--space-5);
         /* На мобильном sidebar сверху — и в виде карточки с отступами с 4 сторон. */
         margin: var(--space-3);
