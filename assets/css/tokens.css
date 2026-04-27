@@ -1,0 +1,267 @@
+/*
+ * ███╗   ███╗██╗███╗   ██╗███████╗██╗   ██╗██████╗ ███╗   ██╗
+ * ████╗ ████║██║████╗  ██║██╔════╝██║   ██║██╔══██╗████╗  ██║
+ * ██╔████╔██║██║██╔██╗ ██║█████╗  ██║   ██║██████╔╝██╔██╗ ██║
+ * ██║╚██╔╝██║██║██║╚██╗██║██╔══╝  ╚██╗ ██╔╝██╔═══╝ ██║╚██╗██║
+ * ██║ ╚═╝ ██║██║██║ ╚████║███████╗ ╚████╔╝ ██║     ██║ ╚████║
+ * ╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚══════╝  ╚═══╝  ╚═╝     ╚═╝  ╚═══╝
+ * ==================================================================
+ *                C S S   T O K E N S   F I L E
+ * ==================================================================
+ * @category    VPN Subsystem
+ * @package     MineVPN\Server
+ * @version     5.0.0
+ * [WARNING]
+ * This source code is strictly proprietary and confidential.
+ * Unauthorized reproduction, distribution, or decompilation
+ * is strictly prohibited and heavily monitored.
+ * @copyright   2026 MineVPN Systems. All rights reserved.
+ *
+ * MineVPN Server — Design Tokens / Дизайн-система (источник истины)
+ *
+ * Единственный источник истины для всех цветов, размеров, типографики и анимаций. Подключается
+ * ПЕРВЫМ на каждой странице через cabinet.php — все остальные CSS файлы ожидают эти переменные.
+ *
+ * Все встроены в :root — доступны глобально через var(--name).
+ *
+ * Структура:
+ *
+ * 1. ПОВЕРХНОСТИ (4 уровня глубины + 3 border):
+ *    • --bg-deep    — самый тёмный, body background
+ *    • --bg-base    — базовый фон контейнеров
+ *    • --surface-1  — card background (основной слой, в котором всё живёт)
+ *    • --surface-2  — вложенный элемент в card (input внутри card)
+ *    • --surface-3  — третий слой, самый светлый (badge внутри input)
+ *
+ * 2. ЦВЕТА (9 брендовых палитр):
+ *    Каждый цвет имеет 4 варианта — base / -hover / -soft (alpha 0.18) / -border (alpha 0.40):
+ *    • blue     — ОСНОВНОЙ акцент (primary buttons, links)
+ *    • violet   — вторичные акценты, градиенты
+ *    • cyan     — пинг, быстрые действия, скорость
+ *    • emerald  — success, «Подключено», VPN manager
+ *    • amber    — warnings, сетевые настройки
+ *    • rose     — errors, danger, «Отключено» (нажатие delete)
+ *    • pink     — «О продукте» страница
+ *    • purple   — консоль (terminal)
+ *    • orange   — бренд (логотип MineVPN — неоновое кольцо)
+ *
+ * 3. ГРАДИЕНТЫ (10 вариантов):
+ *    • grad-primary    — blue → cyan (CTA buttons)
+ *    • grad-accent     — violet → dark-violet
+ *    • grad-success    — emerald → dark-emerald
+ *    • grad-brand      — orange → pink (брендовый диагональный)
+ *    • grad-danger     — rose → dark-rose
+ *    • grad-text-hero  — light-blue → cyan (для gradient text в hero)
+ *    • grad-text-brand — orange → pink (для sidebar-brand и футер-link)
+ *
+ * 4. ТИПОГРАФИКА:
+ *    • --font-sans — Inter с system-fallback (sans-serif stack)
+ *    • --font-mono — JetBrains Mono с system-fallback (для .mono и цифр)
+ *    • 8 размеров: text-xs (13px) → text-hero (54px)
+ *    • 4 leading: tight/snug/normal/relaxed (1.2 → 1.7)
+ *    • 3 tracking: tight/normal/wide
+ *
+ * 5. SPACING (4px grid):
+ *    space-1 (4px) → space-20 (80px). Используется всюду вместо прямых px-значений.
+ *    Гарантирует визуальный ритм во всей панели.
+ *
+ * 6. RADII / SHADOWS / EASING:
+ *    • 6 radii: sm (6px) → 2xl (24px) + full (9999px для пилюлек)
+ *    • 9 теней: 3 обычные + 5 цветных glow (для focus/hover)
+ *    • RDP-friendly: короткий blur (3-28px) — не тормозит рендер в RDP-сессиях
+ *    • 3 ease curves: ease (default), ease-out, ease-spring (для bouncy effects)
+ *    • 3 длительности: fast (120ms), base (160ms), slow (240ms)
+ *
+ * 7. LAYOUT:
+ *    • --sidebar-width  340px
+ *    • --header-height  80px
+ *    • --content-max    2400px (высокий чтобы на 16:9 дисплеях не обрезалось, на 4K — поле по бокам)
+ *
+ * 8. Z-INDEX (7 уровней):
+ *    base (1) < sticky (10) < dropdown (100) < modal-backdrop (900) <
+ *    modal (1000) < toast (1100) < tooltip (1200)
+ *
+ * Reduced motion override:
+ *   @media (prefers-reduced-motion: reduce) → все длительности в 0ms — юзеры с a11y-настройками ОС получают
+ *   мгновенные переходы без настроек в панели.
+ *
+ * Используется:
+ *   • Все CSS файлы проекта (все var(--*) приходят отсюда)
+ *   • cabinet.php — подключает этот файл ПЕРВЫМ в <head>
+ */
+
+:root {
+    /* ── Поверхности ────────────────────────────────────────────────── */
+    --bg-deep:          #0D1220;   /* body background                   */
+    --bg-base:          #151B2E;   /* базовый фон контейнеров           */
+    --surface-1:        #1E2540;   /* card background (основной слой)   */
+    --surface-2:        #2A3352;   /* вложенный элемент в card          */
+    --surface-3:        #364063;   /* третий слой, самый светлый        */
+    --border-subtle:    rgba(255, 255, 255, 0.08);
+    --border-strong:    rgba(255, 255, 255, 0.14);
+    --border-accent:    rgba(59, 130, 246, 0.45);
+
+    /* ── Текст ─────────────────────────────────────────────────────── */
+    --text-primary:     #F8FAFC;
+    --text-secondary:   #CBD5E1;
+    --text-muted:       #94A3B8;
+    --text-disabled:    #64748B;
+
+    /* ── Основной акцент: BLUE ─────────────────────────────────────── */
+    --blue:             #3B82F6;
+    --blue-hover:       #2563EB;
+    --blue-soft:        rgba(59, 130, 246, 0.18);
+    --blue-border:      rgba(59, 130, 246, 0.40);
+    --blue-glow:        rgba(59, 130, 246, 0.35);
+
+    /* Violet — для вторичных акцентов и градиентов */
+    --violet:           #8B5CF6;
+    --violet-hover:     #7C3AED;
+    --violet-soft:      rgba(139, 92, 246, 0.18);
+    --violet-border:    rgba(139, 92, 246, 0.40);
+
+    /* Cyan — пинг, быстрые действия, скорость */
+    --cyan:             #06B6D4;
+    --cyan-hover:       #0891B2;
+    --cyan-soft:        rgba(6, 182, 212, 0.18);
+    --cyan-border:      rgba(6, 182, 212, 0.40);
+
+    /* Emerald — success, "подключено", VPN manager */
+    --emerald:          #10B981;
+    --emerald-hover:    #059669;
+    --emerald-soft:     rgba(16, 185, 129, 0.18);
+    --emerald-border:   rgba(16, 185, 129, 0.40);
+
+    /* Amber — warnings, сеть */
+    --amber:            #F59E0B;
+    --amber-hover:      #D97706;
+    --amber-soft:       rgba(245, 158, 11, 0.18);
+    --amber-border:     rgba(245, 158, 11, 0.40);
+
+    /* Rose — errors, danger, отключено */
+    --rose:             #F43F5E;
+    --rose-hover:       #E11D48;
+    --rose-soft:        rgba(244, 63, 94, 0.18);
+    --rose-border:      rgba(244, 63, 94, 0.40);
+
+    /* Pink — "О продукте" */
+    --pink:             #EC4899;
+    --pink-soft:        rgba(236, 72, 153, 0.18);
+    --pink-border:      rgba(236, 72, 153, 0.40);
+
+    /* Purple — консоль */
+    --purple:           #A855F7;
+    --purple-soft:      rgba(168, 85, 247, 0.18);
+    --purple-border:    rgba(168, 85, 247, 0.40);
+
+    /* Orange — бренд (логотип MineVPN — неоновое кольцо) */
+    --orange:           #F97316;
+    --orange-hover:     #EA580C;
+    --orange-soft:      rgba(249, 115, 22, 0.18);
+    --orange-border:    rgba(249, 115, 22, 0.40);
+
+    /* ── Градиенты ─────────────────────────────────────────────────── */
+    --grad-primary:         linear-gradient(135deg, #3B82F6 0%, #06B6D4 100%);
+    --grad-primary-hover:   linear-gradient(135deg, #2563EB 0%, #0891B2 100%);
+    --grad-accent:          linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%);
+    --grad-accent-hover:    linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%);
+    --grad-success:         linear-gradient(135deg, #10B981 0%, #059669 100%);
+    --grad-success-hover:   linear-gradient(135deg, #059669 0%, #047857 100%);
+    --grad-brand:           linear-gradient(135deg, #F97316 0%, #EC4899 100%);
+    --grad-danger:          linear-gradient(135deg, #F43F5E 0%, #BE123C 100%);
+    --grad-text-hero:       linear-gradient(135deg, #60A5FA 0%, #06B6D4 100%);
+    --grad-text-brand:      linear-gradient(135deg, #F97316 0%, #EC4899 100%);
+
+    /* ── Типографика ────────────────────────────────────────────────── */
+    --font-sans:        'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+    --font-mono:        'JetBrains Mono', ui-monospace, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+
+    --text-xs:          13px;
+    --text-sm:          15px;
+    --text-base:        18px;
+    --text-md:          20px;
+    --text-lg:          24px;
+    --text-xl:          28px;
+    --text-2xl:         38px;
+    --text-hero:        54px;
+
+    --leading-tight:    1.2;
+    --leading-snug:     1.4;
+    --leading-normal:   1.55;
+    --leading-relaxed:  1.7;
+
+    --tracking-tight:   -0.02em;
+    --tracking-normal:  0;
+    --tracking-wide:    0.05em;
+
+    /* ── Spacing (4px grid) ────────────────────────────────────────── */
+    --space-1:          4px;
+    --space-2:          8px;
+    --space-3:          12px;
+    --space-4:          16px;
+    --space-5:          20px;
+    --space-6:          24px;
+    --space-7:          28px;
+    --space-8:          32px;
+    --space-10:         40px;
+    --space-12:         48px;
+    --space-14:         56px;
+    --space-16:         64px;
+    --space-20:         80px;
+
+    /* ── Радиусы ───────────────────────────────────────────────────── */
+    --radius-sm:        6px;
+    --radius-md:        10px;
+    --radius-lg:        14px;
+    --radius-xl:        18px;
+    --radius-2xl:       24px;
+    --radius-full:      9999px;
+
+    /* ── Тени (RDP-friendly — короткий blur) ───────────────────────── */
+    --shadow-sm:            0 1px 3px rgba(0, 0, 0, 0.35);
+    --shadow-md:            0 4px 14px rgba(0, 0, 0, 0.3);
+    --shadow-lg:            0 10px 28px rgba(0, 0, 0, 0.4);
+    --shadow-glow-blue:     0 0 20px rgba(59, 130, 246, 0.3);
+    --shadow-glow-violet:   0 0 20px rgba(139, 92, 246, 0.3);
+    --shadow-glow-cyan:     0 0 20px rgba(6, 182, 212, 0.3);
+    --shadow-glow-emerald:  0 0 20px rgba(16, 185, 129, 0.3);
+    --shadow-glow-rose:     0 0 20px rgba(244, 63, 94, 0.3);
+
+    /* ── Переходы ──────────────────────────────────────────────────── */
+    --ease:             cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-out:         cubic-bezier(0, 0, 0.2, 1);
+    --ease-spring:      cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    --dur-fast:         120ms;
+    --dur-base:         160ms;
+    --dur-slow:         240ms;
+
+    /* ── Layout ────────────────────────────────────────────────────── */
+    --sidebar-width:    340px;
+    --header-height:    80px;
+    /* content-max высокий (было 1760), чтобы на 16:9 экранах (FullHD/QHD)
+       контент не обрезался по краям. На 4K/ультрашироких остаётся поле с боков —
+       иначе линия глаза слишком длинная и читабельность падает. */
+    --content-max:      2400px;
+
+    /* ── Z-index стек ──────────────────────────────────────────────── */
+    --z-base:           1;
+    --z-sticky:         10;
+    --z-dropdown:       100;
+    --z-modal-backdrop: 900;
+    --z-modal:          1000;
+    --z-toast:          1100;
+    --z-tooltip:        1200;
+}
+
+/* ── Уважение к системным настройкам пользователя ────────────────────
+   Пользователи ОС с включённым "Reduce motion" получают мгновенные
+   переходы вместо анимаций. Работает автоматически без настроек в панели. */
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --dur-fast: 0ms;
+        --dur-base: 0ms;
+        --dur-slow: 0ms;
+    }
+}
+</content>
