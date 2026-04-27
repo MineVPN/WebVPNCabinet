@@ -1,0 +1,991 @@
+/*
+ * ███╗   ███╗██╗███╗   ██╗███████╗██╗   ██╗██████╗ ███╗   ██╗
+ * ████╗ ████║██║████╗  ██║██╔════╝██║   ██║██╔══██╗████╗  ██║
+ * ██╔████╔██║██║██╔██╗ ██║█████╗  ██║   ██║██████╔╝██╔██╗ ██║
+ * ██║╚██╔╝██║██║██║╚██╗██║██╔══╝  ╚██╗ ██╔╝██╔═══╝ ██║╚██╗██║
+ * ██║ ╚═╝ ██║██║██║ ╚████║███████╗ ╚████╔╝ ██║     ██║ ╚████║
+ * ╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚══════╝  ╚═══╝  ╚═╝     ╚═╝  ╚═══╝
+ * ==================================================================
+ *               C S S   V P N   P A G E   F I L E
+ * ==================================================================
+ * @category    VPN Subsystem
+ * @package     MineVPN\Server
+ * @version     5.0.0
+ * [WARNING]
+ * This source code is strictly proprietary and confidential.
+ * Unauthorized reproduction, distribution, or decompilation
+ * is strictly prohibited and heavily monitored.
+ * @copyright   2026 MineVPN Systems. All rights reserved.
+ *
+ * MineVPN Server — VPN Page / Стили страницы VPN Manager (один из двух самых больших page-css файлов)
+ *
+ * Страница ?menu=vpn (~26 KB CSS) — управление конфигами VPN с drag-drop приоритетами, bulk выбором, search-фильтром, upload зоной
+ * и inline rename. Связана с pages/vpn-manager.php (HTML), assets/js/pages/vpn.js (вся логика).
+ *
+ * Структура (в порядке появления в файле):
+ *
+ * 1. LAYOUT (2-колонки):
+ *    • .vpn-layout — grid 380px / 1fr (левый столбец фикс + растяжный список справа)
+ *    • .vpn-left  — flex column (status + upload + promo карточки вертикально)
+ *    • < 1280px  — stacked в 1 колонку
+ *
+ * 2. STATUS CARD — блок состояния VPN с кнопками:
+ *    • .status-card  — контейнер (расширяет .card)
+ *    • .status-list  — flex column из .status-row
+ *    • .status-row   — .status-label (muted) + .status-value (primary, mono для чисел)
+ *    • Иконка в .card-title — emerald (24x24)
+ *
+ * 3. FAILOVER NOTICE (.failover-notice):
+ *    Предупреждаем вывод amber-баннер когда работает бэкап. amber-soft фон, amber-border, иконка 20px.
+ *    Рендерится PHP-side если active_id != primary_id, JS-side тост при detect failover.
+ *
+ * 4. CONFIG CARDS (.config-item):
+ *    Основная фича страницы — карточка каждого конфига. Grid layout:
+ *      drag-handle | priority-pill | config-info | actions
+ *    • .config-priority — цифра приоритета (1, 2, 3...) в кружочке
+ *    • .config-name      — имя (contentEditable=true при .is-editing)
+ *    • .config-meta      — мета-инфо (server, type, role) под именем
+ *    • .config-actions   — action-menu-btn (3 точки) + activate-кнопка
+ *    • .reorder-controls — стрелки вверх/вниз для touch-устройств
+ *    • .is-active        — активный конфиг: emerald border + glow
+ *    • .is-primary       — основной (badge в meta)
+ *    • .is-backup        — бэкап (badge в meta)
+ *
+ * 5. DRAG & DROP indicators:
+ *    • .is-dragging      — карточка которую тянут (opacity 0.5)
+ *    • .is-drop-before  — индикатор размещения СВЕРХУ (тонкая синяя линия ::before)
+ *    • .is-drop-after   — индикатор размещения СНИЗУ (::after)
+ *    JS вычисляет before/after по 20% threshold (не 50% — быстрые замены)
+ *
+ * 6. ACTION MENU (.action-menu):
+ *    Dropdown сбоку конфига с actions (Rename, Make backup, Delete...).
+ *    • .action-menu-btn      — кнопка-триггер (3 точки)
+ *    • .action-menu-dropdown — сам дропдаун (.is-open — открыт)
+ *    • .action-menu-item     — пункт меню (.action-menu-item--danger — rose для Delete)
+ *
+ * 7. BULK TOOLBAR (.bulk-toolbar):
+ *    Появляется при body.is-bulk-mode — sticky вверху (или как fixed). Счётчик + bulk_delete кнопка.
+ *    • .bulk-check         — checkbox на каждой карточке (видим только в bulk mode)
+ *    • .config-item.is-selected — выделенный конфиг (blue-soft фон)
+ *
+ * 8. SEARCH (.config-search):
+ *    Input сверху списка. Иконка лупы слева.
+ *    .config-list-header — контейнер search + bulk-toggle кнопки.
+ *
+ * 9. UPLOAD CARD (.upload-card):
+ *    Карточка загрузки конфига в левой колонке.
+ *    • .upload-zone       — dashed border зона (.is-dragover — highlight при drag-over)
+ *    • .upload-zone-text  — лейбл внутри зоны («.ovpn или .conf» или имя выбранного файла)
+ *    • .upload-buy-hint   — сноска под формой с «Купить в MineVPN» линком
+ *    • .vpn-buy-link      — gradient text orange→pink брендовый линк (с стрелочкой »)
+ *
+ * 10. EMPTY STATES:
+ *     • #config-empty-state    — «Нет конфигов» как empty-state-* элементы (подключаются из components.css)
+ *     • .vpn-promo-banner      — «Купить конфиг» promo когда конфигов 0
+ *
+ * 11. PROMO INTEGRATION (5 точек):
+ *     Специальные баннеры продвижения minevpn.net:
+ *     • .vpn-promo-banner             — empty-state CTA (основной брендовый baner)
+ *     • .vpn-single-config-warning   — «У вас всего 1 конфиг» amber warning (риск)
+ *     • .upload-buy-hint              — сноска в upload-card
+ *     (failover toast и sidebar-footer pill — в других файлах)
+ *
+ * 12. RESPONSIVE BREAKPOINTS:
+ *     • < 1280px  — .vpn-layout в 1 колонку (sidebar и список фридруга)
+ *     • < 640px   — .config-item grid реструктурируется, actions внизу; reorder-controls скрыты в bulk mode
+ *
+ * Используется:
+ *   • pages/vpn-manager.php — рендерит всю страницу (.vpn-layout structure)
+ *   • cabinet.php — подключает vpn.css НА странице ?menu=vpn (через vpn-manager.php)
+ *   • assets/js/pages/vpn.js — вся интерактивность (drag, search, bulk, action menus)
+ *
+ * Зависит от:
+ *   tokens.css      — все var(--*) (цвета, spacing, radii)
+ *   components.css  — .card, .btn, .input, .badge, empty-state-*
+ *   base.css        — keyframes (slide-up, pulse-dot)
+ */
+
+/* ════════════════════════════════════════════════════════════════════════
+   МАКЕТ СТРАНИЦЫ (2-колонки: слева статус/загрузка, справа список)
+   ════════════════════════════════════════════════════════════════════════ */
+
+.vpn-layout {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: var(--space-6);
+}
+
+@media (max-width: 1279px) {
+    .vpn-layout { grid-template-columns: 1fr; }
+}
+
+.vpn-left {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   STATUS CARD — блок состояния VPN с кнопками
+   ════════════════════════════════════════════════════════════════════════ */
+
+.status-card {
+    position: relative;
+}
+
+.status-card .card-title svg {
+    width: 24px;
+    height: 24px;
+    color: var(--emerald);
+}
+
+.status-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin-bottom: var(--space-5);
+}
+
+.status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-height: 28px;
+}
+
+.status-label {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.status-value {
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+    text-align: right;
+    font-weight: 600;
+}
+
+.status-value.mono {
+    font-family: var(--font-mono);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   FAILOVER NOTICE — баннер когда работает резервный конфиг
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* Баннер failover */
+.failover-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background: var(--amber-soft);
+    border: 1px solid var(--amber-border);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    color: #FCD34D;
+    margin-bottom: var(--space-4);
+}
+
+.failover-notice svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.failover-notice-text {
+    flex: 1;
+    line-height: var(--leading-snug);
+}
+
+.failover-notice-sub {
+    font-size: var(--text-xs);
+    color: #FDE68A;
+    opacity: 0.8;
+    margin-top: 3px;
+}
+
+.status-actions {
+    display: flex;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+}
+
+.status-actions .btn { flex: 1; min-width: 120px; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   UPLOAD CARD — drag&drop зона для нового конфига
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* Больший padding-bottom — blue glow shadow кнопки "Загрузить"
+   визуально "съедал" стандартный 28px card padding. Докидываем буфер. */
+.upload-card {
+    padding-bottom: var(--space-8);
+}
+
+.upload-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.upload-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-7) var(--space-5);
+    background: var(--surface-2);
+    border: 2px dashed var(--border-strong);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: border-color var(--dur-fast) var(--ease),
+                background-color var(--dur-fast) var(--ease);
+    text-align: center;
+}
+
+.upload-zone:hover,
+.upload-zone.is-dragover {
+    border-color: var(--blue);
+    background: var(--blue-soft);
+}
+
+.upload-zone svg {
+    width: 40px;
+    height: 40px;
+    color: var(--text-muted);
+    margin-bottom: var(--space-3);
+    transition: color var(--dur-fast) var(--ease);
+}
+
+.upload-zone:hover svg,
+.upload-zone.is-dragover svg {
+    color: var(--blue);
+}
+
+.upload-zone-text {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.upload-zone-hint {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin-top: var(--space-2);
+}
+
+.upload-zone input[type="file"] {
+    display: none;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   CONFIG LIST — список конфигов
+   ════════════════════════════════════════════════════════════════════════ */
+
+.config-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+    flex-wrap: wrap;
+}
+
+.config-list-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-size: var(--text-xl);
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.config-list-count {
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.config-list-toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+}
+
+.config-search {
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+    max-width: 300px;
+}
+
+.config-search .input {
+    padding-left: 44px;
+    padding-right: var(--space-3);
+    min-height: 38px;
+}
+
+.config-search svg {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    color: var(--text-muted);
+    pointer-events: none;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   CONFIG CARD — один элемент списка (увеличенные отступы)
+   ════════════════════════════════════════════════════════════════════════ */
+
+.config-items {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.config-item {
+    display: grid;
+    grid-template-columns: auto auto 1fr auto;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background: var(--surface-2);
+    border: 2px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    transition: border-color var(--dur-fast) var(--ease),
+                background-color var(--dur-fast) var(--ease),
+                transform var(--dur-fast) var(--ease),
+                box-shadow var(--dur-fast) var(--ease);
+    position: relative;
+}
+
+.config-item:hover {
+    border-color: var(--border-strong);
+}
+
+/* ── Активный конфиг (подключен) — emerald обводка ───────── */
+.config-item.is-active-up {
+    border-color: var(--emerald);
+    background: linear-gradient(180deg, var(--emerald-soft) 0%, var(--surface-2) 70%);
+    box-shadow: 0 0 0 1px var(--emerald-border), var(--shadow-glow-emerald);
+}
+
+/* ── Активный конфиг но соединение упало — amber ─────────── */
+.config-item.is-active-down {
+    border-color: var(--amber);
+    background: linear-gradient(180deg, var(--amber-soft) 0%, var(--surface-2) 70%);
+}
+
+/* ── Bulk mode — выделенный элемент ───────────────────────── */
+.config-item.is-selected {
+    border-color: var(--blue-border);
+    background: var(--blue-soft);
+}
+
+/* ── Dragging — полупрозрачный оригинал ───────────────────── */
+.config-item.is-dragging {
+    opacity: 0.4;
+    transform: scale(0.98);
+}
+
+/* ── Drop indicator — тонкая синяя линия между карточками (v8).
+   Раньше была обводка целой карточки, но это не явно показывало где вставка в итоге
+   будет. Линия в gap-зоне (-8px) точно показывает место вставки. */
+.config-item.is-drop-before::before,
+.config-item.is-drop-after::after {
+    content: '';
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    height: 4px;
+    background: var(--blue);
+    border-radius: 2px;
+    box-shadow: 0 0 12px var(--blue-glow);
+    z-index: 10;
+    pointer-events: none;
+}
+
+.config-item.is-drop-before::before { top: -8px; }
+.config-item.is-drop-after::after  { bottom: -8px; }
+
+/* ── Drag handle ───────────────────────────────────────────── */
+.drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 28px;
+    color: var(--text-disabled);
+    cursor: grab;
+    border-radius: var(--radius-sm);
+    transition: color var(--dur-fast) var(--ease),
+                background-color var(--dur-fast) var(--ease);
+}
+
+.drag-handle:hover {
+    color: var(--text-secondary);
+    background: var(--surface-3);
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+.drag-handle svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* Reorder controls — вертикальная колонка [↑] [grip] [↓].
+   Стрелки — click-перемещение (touch / кому неудобно тянуть).
+   Grip посередине — HTML5 drag-and-drop (как было). */
+.reorder-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.reorder-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 22px;
+    color: var(--text-disabled);
+    border-radius: var(--radius-sm);
+    transition: color var(--dur-fast) var(--ease),
+                background-color var(--dur-fast) var(--ease);
+    cursor: pointer;
+}
+
+.reorder-btn:hover {
+    color: var(--blue);
+    background: var(--blue-soft);
+}
+
+.reorder-btn:disabled,
+.reorder-btn[disabled] {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.reorder-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Priority + type-icon объединение (средний блок).
+   padding-right для отступа от иконки типа до названия конфига. */
+.priority-type-col {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding-right: var(--space-2);
+}
+
+/* В bulk mode drag handle прячется (внутри .reorder-controls остаются стрелки),
+   а .bulk-check становится видимым как отдельный grid item.
+
+   Чтобы layout не ломался — расширяем grid-template-columns на 5-ю колонку
+   именно в bulk режиме. Иначе .config-actions переполняется в новый ряд. */
+.config-item .bulk-check {
+    display: none;
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--blue);
+}
+
+body.is-bulk-mode .drag-handle {
+    display: none;
+}
+
+body.is-bulk-mode .config-item {
+    grid-template-columns: auto auto auto 1fr auto;
+}
+
+body.is-bulk-mode .config-item .bulk-check {
+    display: block;
+}
+
+/* ── Priority pill ─────────────────────────────────────────── */
+.config-priority {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    height: 32px;
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-md);
+    font-family: var(--font-mono);
+    font-size: var(--text-md);
+    font-weight: 700;
+    background: var(--surface-3);
+    color: var(--text-muted);
+}
+
+.config-item.is-active-up .config-priority {
+    background: var(--emerald);
+    color: #FFFFFF;
+}
+.config-item.is-active-down .config-priority {
+    background: var(--amber);
+    color: #1E2540;
+}
+
+/* ── Type icon ─────────────────────────────────────────────── */
+.config-type-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius-md);
+    flex-shrink: 0;
+}
+
+.config-type-icon--wireguard {
+    background: var(--violet-soft);
+    color: var(--violet);
+}
+.config-type-icon--openvpn {
+    background: var(--orange-soft);
+    color: var(--orange);
+}
+
+.config-type-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* ── Info block ────────────────────────────────────────────── */
+.config-info {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.config-name-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+}
+
+.config-name {
+    font-size: var(--text-md);
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+    outline: none;
+    padding: 3px 6px;
+    margin: -3px -6px;
+    border-radius: var(--radius-sm);
+    min-width: 60px;
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Inline rename mode */
+.config-name.is-editing {
+    background: var(--surface-1);
+    box-shadow: 0 0 0 2px var(--blue);
+    cursor: text;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
+}
+
+.config-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    /* IP раньше был 15px muted (среди второстепенных метаданных), но фактически адрес
+       важнее выдуманного имени — идентифицирует реальный сервер. Поднимаем до text-base. */
+    font-size: var(--text-base);
+    color: var(--text-secondary);
+    flex-wrap: wrap;
+}
+
+.config-meta-type--wireguard { color: var(--violet); font-weight: 600; }
+.config-meta-type--openvpn   { color: var(--orange); font-weight: 600; }
+
+.config-meta-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--text-muted);
+}
+
+/* Адрес сервера — mono, primary белый, weight 600. Равноценный имени конфига. */
+.config-meta-server {
+    font-family: var(--font-mono);
+    color: var(--text-primary);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.config-lastused {
+    font-size: var(--text-xs);
+    color: var(--text-disabled);
+    margin-top: 3px;
+}
+
+/* ── Actions block ──────────────────────────────────────────── */
+.config-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-shrink: 0;
+}
+
+/* ── Action menu (dropdown) ─────────────────────────────────── */
+.action-menu {
+    position: relative;
+}
+
+.action-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    color: var(--text-muted);
+    border-radius: var(--radius-md);
+    transition: background-color var(--dur-fast) var(--ease),
+                color var(--dur-fast) var(--ease);
+}
+
+.action-menu-btn:hover {
+    background: var(--surface-3);
+    color: var(--text-primary);
+}
+
+.action-menu-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    width: 200px;
+    background: var(--surface-1);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    z-index: var(--z-dropdown);
+    display: none;
+    animation: slide-up var(--dur-fast) var(--ease-out) both;
+    overflow: hidden;
+    padding: var(--space-1);
+}
+
+.action-menu.is-open .action-menu-dropdown {
+    display: block;
+}
+
+.action-menu-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    padding: 10px 12px;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-align: left;
+    border-radius: var(--radius-sm);
+    transition: background-color var(--dur-fast) var(--ease),
+                color var(--dur-fast) var(--ease);
+}
+
+.action-menu-item:hover {
+    background: var(--surface-2);
+    color: var(--text-primary);
+}
+
+.action-menu-item svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.action-menu-item--danger {
+    color: var(--rose);
+}
+
+.action-menu-item--danger:hover {
+    background: var(--rose-soft);
+    color: var(--rose);
+}
+
+.action-menu-divider {
+    height: 1px;
+    background: var(--border-subtle);
+    margin: 3px 0;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   BULK TOOLBAR (появляется когда есть выделенные)
+   ════════════════════════════════════════════════════════════════════════ */
+
+.bulk-toolbar {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-4) var(--space-5);
+    background: var(--blue-soft);
+    border: 1px solid var(--blue-border);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-4);
+    animation: slide-up var(--dur-fast) var(--ease-out) both;
+}
+
+body.is-bulk-mode .bulk-toolbar {
+    display: flex;
+}
+
+.bulk-count {
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.bulk-count-number {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    color: var(--blue);
+    font-size: var(--text-md);
+}
+
+.bulk-actions {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
+   MINEVPN PROMO — деликатная интеграция магазина конфигов в UI.
+
+   Три компонента, все контекстные (появляются когда релевантны):
+   • .vpn-promo-banner       — empty state (0 конфигов — полезная подсказка где взять)
+   • .vpn-single-config-warning — при count==1 (реальное предупреждение про отсутствие резерва)
+   • .upload-buy-hint        — сноска под upload form (фоновая CTA)
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* === Empty-state promo banner === */
+.vpn-promo-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-5);
+    padding: var(--space-6);
+    margin-top: var(--space-5);
+    /* Soft brand gradient (rose → orange) — диагональ, как орбы на фоне панели. */
+    background: linear-gradient(135deg,
+        rgba(244, 63, 94, 0.08) 0%,
+        rgba(249, 115, 22, 0.10) 100%);
+    border: 1px solid var(--orange-border);
+    border-radius: var(--radius-xl);
+}
+
+.vpn-promo-banner-icon {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-lg);
+    background: var(--grad-brand);
+    color: #FFFFFF;
+    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
+}
+
+.vpn-promo-banner-icon svg {
+    width: 26px;
+    height: 26px;
+}
+
+.vpn-promo-banner-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.vpn-promo-banner-title {
+    font-size: var(--text-md);
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: var(--space-2);
+    letter-spacing: -0.01em;
+}
+
+.vpn-promo-banner-text {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    line-height: var(--leading-snug);
+    margin-bottom: var(--space-4);
+}
+
+.vpn-promo-banner-actions {
+    display: flex;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+}
+
+/* === Single config warning === */
+.vpn-single-config-warning {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4) var(--space-5);
+    background: var(--amber-soft);
+    border: 1px solid var(--amber-border);
+    border-radius: var(--radius-lg);
+}
+
+.vpn-single-config-warning-icon {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    background: rgba(245, 158, 11, 0.22);
+    color: var(--amber);
+}
+
+.vpn-single-config-warning-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.vpn-single-config-warning-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.vpn-single-config-warning-title {
+    font-size: var(--text-sm);
+    font-weight: 700;
+    color: #FCD34D;
+    margin-bottom: 2px;
+}
+
+.vpn-single-config-warning-text {
+    font-size: var(--text-xs);
+    color: #FDE68A;
+    opacity: 0.9;
+    line-height: var(--leading-snug);
+}
+
+.vpn-single-config-warning .btn {
+    flex-shrink: 0;
+}
+
+/* === Upload card buy-hint (сноска под формой) === */
+.upload-buy-hint {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--border-subtle);
+    flex-wrap: wrap;
+}
+
+/* Brand-gradient text link с стрелкой — акцентный, но не кнопочный. */
+.vpn-buy-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--text-sm);
+    font-weight: 700;
+    /* Gradient text (как sidebar-brand-name) — видно и красиво, но не кричит. */
+    background: var(--grad-text-brand);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    transition: filter var(--dur-fast) var(--ease);
+}
+
+.vpn-buy-link svg {
+    /* SVG не подхватытывает gradient-text — окрашиваем отдельно в оранжевый (середина градиента). */
+    color: var(--orange);
+    transition: transform var(--dur-fast) var(--ease);
+}
+
+.vpn-buy-link:hover {
+    filter: brightness(1.15);
+}
+
+.vpn-buy-link:hover svg {
+    transform: translateX(3px);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 640px) {
+    .config-item {
+        grid-template-columns: auto auto 1fr;
+        grid-template-rows: auto auto;
+        gap: var(--space-3);
+    }
+
+    .config-actions {
+        grid-column: 1 / -1;
+        justify-content: flex-end;
+    }
+
+    /* На мобильном в bulk mode reorder-controls прячем — экран узкий,
+       стрелки + чекбокс + priority + info не помещаются в три колонки. */
+    body.is-bulk-mode .config-item {
+        grid-template-columns: auto auto 1fr;
+    }
+    body.is-bulk-mode .reorder-controls {
+        display: none;
+    }
+
+    .config-meta {
+        font-size: var(--text-sm);
+    }
+
+    .config-list-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .config-search {
+        max-width: none;
+    }
+
+    /* Promo banner на мобильном — icon и текст вертикально (уже узко для горизонтального) */
+    .vpn-promo-banner {
+        flex-direction: column;
+        padding: var(--space-5);
+    }
+
+    /* Warning — flex-wrap чтобы кнопка перешла в новый ряд если не влазит */
+    .vpn-single-config-warning {
+        flex-wrap: wrap;
+    }
+    .vpn-single-config-warning-body {
+        flex-basis: calc(100% - 64px);
+    }
+}

@@ -1,0 +1,157 @@
+/*
+ * ███╗   ███╗██╗███╗   ██╗███████╗██╗   ██╗██████╗ ███╗   ██╗
+ * ████╗ ████║██║████╗  ██║██╔════╝██║   ██║██╔══██╗████╗  ██║
+ * ██╔████╔██║██║██╔██╗ ██║█████╗  ██║   ██║██████╔╝██╔██╗ ██║
+ * ██║╚██╔╝██║██║██║╚██╗██║██╔══╝  ╚██╗ ██╔╝██╔═══╝ ██║╚██╗██║
+ * ██║ ╚═╝ ██║██║██║ ╚████║███████╗ ╚████╔╝ ██║     ██║ ╚████║
+ * ╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚══════╝  ╚═══╝  ╚═╝     ╚═╝  ╚═══╝
+ * ==================================================================
+ *           C S S   C O N S O L E   P A G E   F I L E
+ * ==================================================================
+ * @category    VPN Subsystem
+ * @package     MineVPN\Server
+ * @version     5.0.0
+ * [WARNING]
+ * This source code is strictly proprietary and confidential.
+ * Unauthorized reproduction, distribution, or decompilation
+ * is strictly prohibited and heavily monitored.
+ * @copyright   2026 MineVPN Systems. All rights reserved.
+ *
+ * MineVPN Server — Console Page / Стили страницы веб-терминала
+ *
+ * Страница ?menu=console — «macOS-окно» с traffic-light кнопками + iframe в shellinabox terminal.
+ * Связана с pages/console.php (HTML и JS) и shellinabox-theme.css (стили внутри iframe).
+ *
+ * Основные элементы:
+ *
+ * 1. .console-card  — основной контейнер «mac окна» (surface-1, radius-xl, overflow:hidden).
+ *    height: calc(100vh - 160px) — заполняет viewport минус sidebar и паддинги.
+ *    flex column — console-bar сверху, console-frame-wrap растягивается.
+ *
+ * 2. .console-bar — верхняя панель (bg-base, border-bottom).
+ *    Слева: traffic-lights, посередине: console-title (root@hostname), справа: console-bar-actions (Перезагрузить, Новое окно).
+ *
+ * 3. .traffic-lights — имитация macOS кружочков (12px, 3 шт.):
+ *      • .traffic-light--r — #FF5F57 (красный, close)
+ *      • .traffic-light--y — #FEBC2E (жёлтый, minimize)
+ *      • .traffic-light--g — #28C840 (зелёный, fullscreen)
+ *    Не функциональные (чистый декор) — просто брендовый штрих в стиле macOS-терминала.
+ *
+ * 4. .console-frame-wrap — обёртка iframe (flex:1, bg #0C0C0C):
+ *    НИКАКОГО padding! Иначе scrollbar iframe-а (рендерится браузером по краю самого iframe-а)
+ *    висит «в поветри» внутри padding-зоны. Сам shellinabox имеет внутренний padding в vt100 — текст не прилипает к краям.
+ *
+ * 5. .console-frame — сам iframe (border:0, bg #0C0C0C совпадает с shellinabox-theme).
+ *
+ * 6. .console-diag — блок диагностики фейлов (виден вместо iframe если shellinabox недоступен):
+ *    • .console-diag .warn — яркий rose заголовок («⚠ shellinabox не отвечает»)
+ *    • .console-diag .cmd  — подсвеченная команда (cyan, mono шрифт) — «sudo systemctl restart shellinabox»
+ *
+ * Используется:
+ *   • pages/console.php — рендерит .console-card > .console-bar + .console-frame-wrap > iframe
+ *   • cabinet.php — подключает console.css НА странице console (через console.php)
+ *
+ * Связь с shellinabox-theme.css:
+ *   Этот файл — внешнее окно (mac-стиль console в панели). shellinabox-theme.css — внутренняя
+ *   тема (terminal vt100 внутри iframe). Два изолированных слоя, влияют один на другого только через базовый bg.
+ *
+ * Зависит от:
+ *   tokens.css (var(--surface-1), --bg-base, --border-subtle, --radius-xl, --space-*)
+ */
+
+.console-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 160px);
+    min-height: 420px;
+}
+
+.console-bar {
+    background: var(--bg-base);
+    padding: var(--space-2) var(--space-4);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.console-bar-actions {
+    margin-left: auto;
+    display: flex;
+    gap: var(--space-2);
+}
+
+.traffic-lights {
+    display: flex;
+    gap: var(--space-1);
+    margin-right: var(--space-2);
+}
+
+.traffic-light {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.traffic-light--r { background: #FF5F57; }
+.traffic-light--y { background: #FEBC2E; }
+.traffic-light--g { background: #28C840; }
+
+.console-title {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+.console-frame-wrap {
+    flex: 1;
+    display: flex;
+    background: #0C0C0C;
+    /* НИКАКИХ padding — иначе скроллбар iframe (рендерится браузером по правому/нижнему
+       краю самого iframe-а) висит "в поветри" внутри padding-зоны карточки.
+       Сам shellinabox рендерит vt100 со своим внутренним padding — текст не прилипнет к краям.
+       Полностью убран padding по всем сторонам — скроллбар приклеен к правому и нижнему краю карточки. */
+    padding: 0;
+}
+
+.console-frame {
+    flex: 1;
+    width: 100%;
+    border: 0;
+    background: #0C0C0C;
+}
+
+.console-diag {
+    padding: var(--space-8) var(--space-6);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    line-height: var(--leading-relaxed);
+    overflow-y: auto;
+    flex: 1;
+}
+
+.console-diag .cmd {
+    display: block;
+    background: var(--bg-deep);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: var(--space-2) var(--space-3);
+    color: var(--cyan);
+    margin: var(--space-1) 0 var(--space-3);
+    word-break: break-all;
+}
+
+.console-diag .warn {
+    display: block;
+    color: var(--rose);
+    font-size: var(--text-md);
+    font-weight: 700;
+    margin-bottom: var(--space-4);
+}
+</content>
