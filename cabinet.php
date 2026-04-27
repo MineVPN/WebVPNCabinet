@@ -1,272 +1,200 @@
 <?php
-/**
- * ███╗   ███╗██╗███╗   ██╗███████╗██╗   ██╗██████╗ ███╗   ██╗
- * ████╗ ████║██║████╗  ██║██╔════╝██║   ██║██╔══██╗████╗  ██║
- * ██╔████╔██║██║██╔██╗ ██║█████╗  ██║   ██║██████╔╝██╔██╗ ██║
- * ██║╚██╔╝██║██║██║╚██╗██║██╔══╝  ╚██╗ ██╔╝██╔═══╝ ██║╚██╗██║
- * ██║ ╚═╝ ██║██║██║ ╚████║███████╗ ╚████╔╝ ██║     ██║ ╚████║
- * ╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚══════╝  ╚═══╝  ╚═╝     ╚═╝  ╚═══╝
- * ══════════════════════════════════════════════════════════════════
- *              C A B I N E T   P A G E   F I L E
- * ══════════════════════════════════════════════════════════════════
- * * @category    VPN Subsystem
- * * @package     MineVPN\Server
- * * @version     5.0.0
- * * [WARNING] 
- * This source code is strictly proprietary and confidential. 
- * Unauthorized reproduction, distribution, or decompilation 
- * is strictly prohibited and heavily monitored.
- * * @copyright   2026 MineVPN Systems. All rights reserved.
- *
- * MineVPN Server — Cabinet / Главная оболочка панели
- * Версия: 5 — редизайн (синяя палитра, увеличенный UI, Dashboard поглощён Stats)
- *
- * Ответственность:
- *   • Управление сессиями (timeout 8ч, idle 30мин, проверка IP)
- *   • Роутинг к pages/*.php через параметр ?menu=X
- *   • Sidebar + layout каркас (рендер навигации, cache-buster версия CSS/JS)
- *
- * POST handlers (PRG pattern):
- *   Форма-POST идёт в cabinet.php, но обработчик выбирается по ?menu=X:
- *     ?menu=vpn + POST → pages/vpn-manager.handler.php
- *   Хэндлер выполняет действие и делает header('Location:...') + exit.
- *   Без PRG — F5 или location.reload() в JS повторяет form submission (дубли конфигов).
- *
- * Взаимодействует с:
- *   • index.php — входная точка, include этого файла при валидной сессии
- *   • login.php — редирект сюда при отсутствии/timeout сессии
- *   • logout.php — ссылка в sidebar (пункт «Выход»)
- *   • pages/*.php — все страницы панели (stats, vpn-manager, pinger, console,
- *                  netsettings, settings, about) — включаются в основной layout
- *   • pages/*.handler.php — POST handlers для PRG (vpn-manager.handler.php и др.)
- *   • assets/css/{tokens,base,components,layout}.css — глобальные стили
- *   • assets/js/lib/{toast,progress,shortcuts,custom-select,confirm}.js — компоненты UI
- *   • assets/js/app.js — bootstrap (ping service, loading overlay, flash messages, failover toast)
- *
- */
+// ----- ВСЯ ТВОЯ PHP-ЛОГИКА ОСТАЕТСЯ ЗДЕСЬ БЕЗ ИЗМЕНЕНИЙ -----
+session_start();
 
-if (session_status() === PHP_SESSION_NONE) { session_start(); }
-
-// ── Аутентификация ────────────────────────────────────────────────
 if (!isset($_SESSION["authenticated"]) || $_SESSION["authenticated"] !== true) {
     header("Location: login.php");
     exit();
 }
 
-// ── Таймауты сессии ────────────────────────────────────────────────
-define('SESSION_TIMEOUT', 8 * 3600);
-if (isset($_SESSION['login_time']) && (time() - $_SESSION['login_time']) > SESSION_TIMEOUT) {
-    session_unset(); session_destroy();
-    header('Location: login.php?reason=timeout'); exit();
-}
-$inactiveTimeout = 30 * 60;
-if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > $inactiveTimeout) {
-    session_unset(); session_destroy();
-    header('Location: login.php?reason=timeout'); exit();
-}
-$_SESSION['last_activity'] = time();
-
-// ── Защита от session hijacking (смена IP) ─────────────────────────
-if (isset($_SESSION['ip']) && !empty($_SESSION['ip'])) {
-    $currentIp = $_SERVER['REMOTE_ADDR'] ?? '';
-    if ($currentIp !== $_SESSION['ip']) {
-        session_unset(); session_destroy();
-        header('Location: login.php'); exit();
-    }
-}
-
-// ── Роутинг меню ───────────────────────────────────────────────────
-// Стартовая страница — stats (пункт "Обзор" в меню).
-// Dashboard удалён в v5 — его функции (быстрый обзор) поглощены Stats.
-if (isset($_POST['menu'])) {
+if(isset($_POST['menu'])){
     $_GET['menu'] = $_POST['menu'];
 }
-$menu_item = $_GET['menu'] ?? 'stats';
 
-$menu_pages = [
-    'stats'       => 'pages/stats.php',
-    'vpn'         => 'pages/vpn-manager.php',
-    'ping'        => 'pages/pinger.php',
-    'console'     => 'pages/console.php',
-    'netsettings' => 'pages/netsettings.php',
-    'settings'    => 'pages/settings.php',
-    'about'       => 'pages/about.php',
-];
-if (!array_key_exists($menu_item, $menu_pages)) {
-    $menu_item = 'stats';
-}
+// ИЗМЕНЕНИЕ: Логика определения страницы по умолчанию остаётся
+if (isset($_GET['menu'])) {
+    $menu_item = $_GET['menu'];
+} else {
+    $wireguard_config_path = '/etc/wireguard/tun0.conf';
+    $openvpn_config_path = '/etc/openvpn/tun0.conf';
 
-// ── POST handlers ───────────────────────────────────────────────────────────────
-// Обработчики form POST отделены от render-файлов и выполняются ДО вывода HTML.
-// Это позволяет им делать header('Location: ...') для PRG паттерна.
-// Без PRG — повторный reload в браузере (в т. ч. вызванный location.reload() из JS)
-// повторяет form submission → дублируются загруженные конфиги. ───────────────────
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Имя хэндлера = имя render-файла без .php + .handler.php
-    // (напр. pages/vpn-manager.php → pages/vpn-manager.handler.php)
-    $renderFile  = $menu_pages[$menu_item];
-    $handlerPath = __DIR__ . '/' . preg_replace('/\.php$/', '.handler.php', $renderFile);
-    if (file_exists($handlerPath)) {
-        include_once $handlerPath;
-        // Хэндлер должен сам вызвать header('Location:...') + exit для PRG.
-        // Если этого не случилось (хэндлер не сработал) — продолжаем обычный render.
+    if (file_exists($wireguard_config_path)) {
+        $menu_item = 'wireguard';
+    } elseif (file_exists($openvpn_config_path)) {
+        $menu_item = 'openvpn';
+    } else {
+        $menu_item = 'openvpn';
     }
 }
 
-// Хелпер для active-класса меню
-function menuActive(string $current, string $item): string {
-    return $current === $item ? 'menu-item is-active' : 'menu-item';
+// ИЗМЕНЕНИЕ: Добавляем отдельное определение активного типа VPN для меню
+$active_vpn_type = null;
+if (file_exists('/etc/wireguard/tun0.conf')) {
+    $active_vpn_type = 'wireguard';
+} elseif (file_exists('/etc/openvpn/tun0.conf')) {
+    $active_vpn_type = 'openvpn';
 }
 
-// ── Версия CSS/JS для cache-busting ───────────────────────────────
-// Инкрементировать при каждом изменении файлов assets/css или assets/js.
-// Клиентский кэш задан на 1 год в .htaccess — смена ?v= — единственный способ
-// заставить браузер скачать новые ассеты.
-//
-// 5.6.4 → 5.6.5: BUGFIXES для модального вікна:
-//                1. Прибрано backdrop-filter: blur(6px) в .modal-backdrop — він їв ресурс на слабкому залізі.
-//                   Залишено рівномірне затемнення rgba(0.85) — контраст достатній без blur.
-//                2. confirm.js: компенсація scrollbar gutter shift (body padding-right = scrollbarWidth)
-//                   — контент не дьоргається вправо коли викликається модалка.
-//                + about.php max-width 1100→1600px (розтягується ширше).
-$cssVer = '5.6.5';
-?><!DOCTYPE html>
+
+$menu_pages = [
+    'openvpn' => 'openvpn.php',
+    'wireguard' => 'wireguard.php',
+    'ping' => 'pinger.php',
+    'netsettings' => 'netsettings.php',
+    'settings' => 'settings.php',
+    'about' => 'about.php'
+];
+
+if (!array_key_exists($menu_item, $menu_pages)) {
+    $menu_item = 'openvpn';
+}
+?>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="assets/img/favicon.png">
-    <title>MineVPN Server Panel</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <title>SERVER</title>
+    <script src="tailwindcss.js"></script>
 
-    <link rel="stylesheet" href="assets/css/tokens.css?v=<?php echo $cssVer; ?>">
-    <link rel="stylesheet" href="assets/css/base.css?v=<?php echo $cssVer; ?>">
-    <link rel="stylesheet" href="assets/css/components.css?v=<?php echo $cssVer; ?>">
-    <link rel="stylesheet" href="assets/css/layout.css?v=<?php echo $cssVer; ?>">
-</head>
-<body data-page="<?php echo htmlspecialchars($menu_item); ?>">
+    <style>
+    body { font-family: 'Inter', sans-serif; background-color: #0F172A; }
+    .glassmorphism { 
+        background: rgba(30, 41, 59, 0.6);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background-color: #475569; border-radius: 10px; border: 2px solid #1e293b; }
+    ::-webkit-scrollbar-thumb:hover { background-color: #64748b; }
+    * { scrollbar-width: thin; scrollbar-color: #475569 #1e293b; }
+    </style>
 
-<div class="app">
-
-    <!-- ════════════════════ Sidebar ════════════════════ -->
-    <aside class="sidebar">
-
-        <!-- Брендинг / лого -->
-        <a href="cabinet.php" class="sidebar-brand" aria-label="MineVPN">
-            <img src="assets/img/logo.png" alt="">
-            <div class="sidebar-brand-text">
-                <div class="sidebar-brand-name">MineVPN</div>
-                <div class="sidebar-brand-sub">Server Panel</div>
-            </div>
-        </a>
-
-        <!-- Навигация -->
-        <nav class="sidebar-nav" aria-label="Навигация">
-
-            <a href="cabinet.php?menu=stats" class="<?php echo menuActive($menu_item, 'stats'); ?>" data-accent="blue">
-                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                </svg>
-                <span class="menu-label">Обзор</span>
-            </a>
-
-            <a href="cabinet.php?menu=vpn" class="<?php echo menuActive($menu_item, 'vpn'); ?>" data-accent="emerald">
-                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-                </svg>
-                <span class="menu-label">VPN</span>
-                <span class="menu-meta">
-                    <span id="sidebar-vpn-dot" class="status-dot status-dot--off" aria-hidden="true"></span>
-                    <span id="sidebar-ping-display" class="menu-ping">—</span>
-                </span>
-            </a>
-
-            <a href="cabinet.php?menu=ping" class="<?php echo menuActive($menu_item, 'ping'); ?>" data-accent="cyan">
-                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                </svg>
-                <span class="menu-label">Пинг</span>
-            </a>
-
-            <a href="cabinet.php?menu=console" class="<?php echo menuActive($menu_item, 'console'); ?>" data-accent="purple">
-                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                </svg>
-                <span class="menu-label">Консоль</span>
-            </a>
-
-            <a href="cabinet.php?menu=netsettings" class="<?php echo menuActive($menu_item, 'netsettings'); ?>" data-accent="amber">
-                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
-                </svg>
-                <span class="menu-label">Сеть</span>
-            </a>
-
-            <a href="cabinet.php?menu=settings" class="<?php echo menuActive($menu_item, 'settings'); ?>" data-accent="slate">
-                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                    <circle cx="12" cy="12" r="3"/>
-                </svg>
-                <span class="menu-label">Настройки</span>
-            </a>
-
-            <a href="cabinet.php?menu=about" class="<?php echo menuActive($menu_item, 'about'); ?>" data-accent="pink">
-                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-                    <circle cx="12" cy="12" r="10"/>
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 16v-4m0-4h.01"/>
-                </svg>
-                <span class="menu-label">О продукте</span>
-            </a>
-
-            <div class="sidebar-divider"></div>
-
-            <a href="logout.php" class="menu-item menu-item--logout">
-                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-                </svg>
-                <span class="menu-label">Выход</span>
-            </a>
-        </nav>
-
-        <!-- Футер: посылка на магазин MineVPN с иконкой. Brand-gradient text и tonal hover. -->
-        <div class="sidebar-footer">
-            <a href="https://minevpn.net/" target="_blank" rel="noopener noreferrer" class="sidebar-footer-link">
-                <svg class="sidebar-footer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
-                </svg>
-                <span class="sidebar-footer-text">minevpn.net</span>
-                <svg class="sidebar-footer-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
-                </svg>
-            </a>
-        </div>
-    </aside>
-
-    <!-- ════════════════════ Основной контент ════════════════════ -->
-    <main class="main">
-        <div class="page-content">
-            <?php
-            $pagePath = __DIR__ . '/' . $menu_pages[$menu_item];
-            if (file_exists($pagePath)) {
-                include_once $pagePath;
-            } else {
-                echo '<div class="card"><div class="empty-state">';
-                echo '<div class="empty-state-title text-rose">Страница не найдена</div>';
-                echo '<div class="empty-state-text">Проверьте параметр ?menu=</div>';
-                echo '</div></div>';
+    <script>
+    function Notice(text) {
+        var elements = document.querySelectorAll('.notice');
+        elements.forEach(function(element) {
+            element.textContent = text;
+            if (element.classList.contains('hidden')) {
+                element.classList.remove('hidden');
             }
-            ?>
-        </div>
-    </main>
+        });
+    }
 
-</div>
+    // ИЗМЕНЕНИЕ: Добавлена функция обновления пинга в боковом меню
+    function updateSidebarPing() {
+        const pingElement = document.getElementById('sidebar-ping-display');
+        // Если элемента нет на странице (например, на странице настроек), ничего не делаем
+        if (!pingElement) {
+            return;
+        }
 
-<!-- ════════════════════ Скрипты ════════════════════ -->
-<script src="assets/js/lib/toast.js?v=<?php echo $cssVer; ?>"></script>
-<script src="assets/js/lib/progress.js?v=<?php echo $cssVer; ?>"></script>
-<script src="assets/js/lib/shortcuts.js?v=<?php echo $cssVer; ?>"></script>
-<script src="assets/js/lib/custom-select.js?v=<?php echo $cssVer; ?>"></script>
-<script src="assets/js/lib/confirm.js?v=<?php echo $cssVer; ?>"></script>
-<script src="assets/js/app.js?v=<?php echo $cssVer; ?>"></script>
+        const xhr = new XMLHttpRequest();
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState == 4 && xhr.status == 200) {
+                pingElement.classList.remove('hidden');
+                const response = xhr.responseText;
+                pingElement.classList.remove('text-green-300', 'text-orange-300', 'text-red-300');
 
+                if (response.indexOf("NO PING") == -1) {
+                    const pingValue = Math.round(parseFloat(response));
+                    pingElement.textContent = `${pingValue}мс`;
+                    if (pingValue < 100) pingElement.classList.add('text-green-300');
+                    else if (pingValue < 200) pingElement.classList.add('text-orange-300');
+                    else pingElement.classList.add('text-red-300');
+                } else {
+                    pingElement.textContent = 'X';
+                    pingElement.classList.add('text-red-300');
+                }
+            }
+        };
+        // Пингуем через tun0, так как это общий интерфейс для обоих VPN
+        xhr.open("GET", "ping.php?host=8.8.8.8&interface=tun0", true);
+        xhr.send();
+    }
+    
+    // Запускаем обновление при загрузке и по интервалу
+    document.addEventListener('DOMContentLoaded', () => {
+        updateSidebarPing();
+        setInterval(updateSidebarPing, 3000); // Обновляем каждые 5 секунд
+    });
+    </script>
+</head>
+<body class="text-slate-300">
+
+    <div class="flex min-h-screen">
+        <aside class="w-64 flex-shrink-0 bg-slate-900 p-4 flex flex-col border-r border-slate-800">
+            <a href="cabinet.php" class="p-4 mb-6 text-center block">
+                <img src="logo.png" alt="Logo" class="w-48 h-48 mx-auto transition-all">
+            </a>
+
+            <nav class="flex flex-col gap-2">
+                <a href="cabinet.php?menu=openvpn" class="flex items-center gap-4 px-4 py-3 rounded-lg transition-colors 
+                    <?php echo ($menu_item == 'openvpn') ? 'bg-violet-500/20 text-white shadow-inner' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'; ?>">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                    <span class="font-medium">OpenVPN</span>
+                    <?php if ($active_vpn_type == 'openvpn'): ?>
+                        <span id="sidebar-ping-display" class="ml-auto text-xs font-mono bg-slate-700 px-2 py-0.5 rounded-full">--</span>
+                    <?php endif; ?>
+                </a>
+                <a href="cabinet.php?menu=wireguard" class="flex items-center gap-4 px-4 py-3 rounded-lg transition-colors
+                    <?php echo ($menu_item == 'wireguard') ? 'bg-violet-500/20 text-white shadow-inner' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'; ?>">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                    <span class="font-medium">WireGuard</span>
+                    <?php if ($active_vpn_type == 'wireguard'): ?>
+                        <span id="sidebar-ping-display" class="ml-auto text-xs font-mono bg-slate-700 px-2 py-0.5 rounded-full">--</span>
+                    <?php endif; ?>
+                </a>
+                <a href="cabinet.php?menu=ping" class="flex items-center gap-4 px-4 py-3 rounded-lg transition-colors
+                    <?php echo ($menu_item == 'ping') ? 'bg-violet-500/20 text-white shadow-inner' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'; ?>">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    <span class="font-medium">Ping</span>
+                </a>
+                <a href="cabinet.php?menu=netsettings" class="flex items-center gap-4 px-4 py-3 rounded-lg transition-colors
+                    <?php echo ($menu_item == 'netsettings') ? 'bg-violet-500/20 text-white shadow-inner' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'; ?>">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.25 12h17.5"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2.25c-4.14 3.333-4.14 13.167 0 19.5 4.14-6.333 4.14-16.167 0-19.5z"></path>
+                    </svg>
+                    <span class="font-medium">Настройки сети</span>
+                </a>
+                <a href="cabinet.php?menu=settings" class="flex items-center gap-4 px-4 py-3 rounded-lg transition-colors
+                    <?php echo ($menu_item == 'settings') ? 'bg-violet-500/20 text-white shadow-inner' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'; ?>">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    <span class="font-medium">Настройки</span>
+                </a>
+                <a href="cabinet.php?menu=about" class="flex items-center gap-4 px-4 py-3 rounded-lg transition-colors
+                    <?php echo ($menu_item == 'about') ? 'bg-violet-500/20 text-white shadow-inner' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'; ?>">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span class="font-medium">О Продукте</span>
+                </a>
+                <a href="logout.php" class="flex items-center gap-4 px-4 py-3 rounded-lg text-slate-400 hover:bg-red-500/20 hover:text-red-400 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                    <span class="font-medium">Выход</span>
+                </a>
+            </nav>
+
+        </aside>
+
+        <main class="flex-grow p-4 sm:p-8 w-full">
+            
+            <div class="glassmorphism rounded-2xl p-6 sm:p-8 h-full">
+                
+                <div class="notice hidden bg-green-500/20 text-green-300 p-4 rounded-xl border border-green-500/30 mb-6"></div>
+                <?php
+                include_once $menu_pages[$menu_item];
+                ?>
+                <div class="bg-sky-500/20 text-sky-300 p-4 rounded-xl border border-sky-500/30 mt-6 text-center">
+                Покупай только лучшие VPN конфиги у MineVPN (<a href='https://minevpn.net/' target="_blank" class="font-bold hover:underline">Сайт</a> | <a href='https://t.me/MineVpn_Bot' target="_blank" class="font-bold hover:underline">Telegram Bot</a>)
+            </div>
+            </div>
+
+        </main>
+    </div>
 </body>
 </html>
