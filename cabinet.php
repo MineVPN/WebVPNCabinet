@@ -129,7 +129,13 @@ function menuActive(string $current, string $item): string {
 //                2. confirm.js: компенсація scrollbar gutter shift (body padding-right = scrollbarWidth)
 //                   — контент не дьоргається вправо коли викликається модалка.
 //                + about.php max-width 1100→1600px (розтягується ширше).
-$cssVer = '5.6.5';
+//
+// 5.6.5 → 5.6.6: КОСМЕТИКА сидбару:
+//                Sidebar scrollbar приховано (scrollbar-width: none + ::-webkit-scrollbar
+//                display: none). Меню коротке, скрол рідко потрібний, а 12px брендова смужка
+//                візуально перекривалася з gradient-бордером (rose-violet-orange).
+//                Скрол все ще працює (коліскою/свайпом) — просто без відображення індикатора.
+$cssVer = '5.6.6';
 ?><!DOCTYPE html>
 <html lang="ru">
 <head>
