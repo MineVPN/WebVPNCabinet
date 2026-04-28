@@ -874,14 +874,11 @@ if (result.ok) {
 
 ## Тестирование
 
-В репозитории есть два диагностических скрипта (живут в [MineVPN/VPN](https://github.com/MineVPN/VPN/tree/main/diagnostic)):
+В репозитории есть два диагностический скрипт ([MineVPN/VPN](https://github.com/MineVPN/VPN/tree/main/docs/diagnostic.md)):
 
 ```bash
 # Общая диагностика v5 (~80 проверок)
-sudo bash diagnostic.sh
-
-# SSH-специфичная диагностика
-sudo bash diag-ssh.sh
+curl -O https://raw.githubusercontent.com/MineVPN/VPN/main/diagnostic.sh && sudo bash diagnostic.sh
 ```
 
 Перед PR в `main` проверь:
@@ -969,14 +966,11 @@ sudo tail -f /var/log/minevpn/events.log
 ### Полная диагностика
 
 ```bash
-# Системная — 16 секций, ~80 проверок
-sudo bash /tmp/diagnostic.sh
-
-# SSH — если проблемы с SSH-доступом
-sudo bash /tmp/diag-ssh.sh
+# Общая диагностика v5 (~80 проверок)
+curl -O https://raw.githubusercontent.com/MineVPN/VPN/main/diagnostic.sh && sudo bash diagnostic.sh
 ```
 
-См. [MineVPN/VPN/docs/diagnostic.md](https://github.com/MineVPN/VPN) для подробностей.
+См. [MineVPN/VPN/docs/diagnostic.md](https://github.com/MineVPN/VPN/docs/diagnostic.md) для подробностей.
 
 ---
 
