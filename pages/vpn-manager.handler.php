@@ -115,7 +115,7 @@ if (isset($_FILES["config_file"]) && !empty($_FILES["config_file"]["name"])) {
             $message = "Файл пустой";
             $messageType = "error";
         } elseif (!is_dir(MINEVPN_CONFIG_PATH)) {
-            $message = "Директория " . MINEVPN_CONFIG_PATH . " не существует. Запустите sudo bash update.sh";
+            $message = "Директория " . MINEVPN_CONFIG_PATH . " не существует. Запустите sudo bash /var/www/html/update.sh";
             $messageType = "error";
         } elseif (!is_writable(MINEVPN_CONFIG_PATH)) {
             $owner = function_exists('posix_getpwuid') ? posix_getpwuid(fileowner(MINEVPN_CONFIG_PATH))['name'] : fileowner(MINEVPN_CONFIG_PATH);
