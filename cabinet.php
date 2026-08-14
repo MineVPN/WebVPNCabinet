@@ -1,24 +1,18 @@
 <?php
 /**
- * ███╗   ███╗██╗███╗   ██╗███████╗██╗   ██╗██████╗ ███╗   ██╗
- * ████╗ ████║██║████╗  ██║██╔════╝██║   ██║██╔══██╗████╗  ██║
- * ██╔████╔██║██║██╔██╗ ██║█████╗  ██║   ██║██████╔╝██╔██╗ ██║
- * ██║╚██╔╝██║██║██║╚██╗██║██╔══╝  ╚██╗ ██╔╝██╔═══╝ ██║╚██╗██║
- * ██║ ╚═╝ ██║██║██║ ╚████║███████╗ ╚████╔╝ ██║     ██║ ╚████║
- * ╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚══════╝  ╚═══╝  ╚═╝     ╚═╝  ╚═══╝
  * ══════════════════════════════════════════════════════════════════
  *              C A B I N E T   P A G E   F I L E
  * ══════════════════════════════════════════════════════════════════
  * * @category    VPN Subsystem
- * * @package     MineVPN\Server
+ * * @package     VPN\Server
  * * @version     5.0.0
  * * [WARNING] 
  * This source code is strictly proprietary and confidential. 
  * Unauthorized reproduction, distribution, or decompilation 
  * is strictly prohibited and heavily monitored.
- * * @copyright   2026 MineVPN Systems. All rights reserved.
+ * * @copyright   2026 VPN Systems. All rights reserved.
  *
- * MineVPN Server — Cabinet / Главная оболочка панели
+ * VPN Server — Cabinet / Главная оболочка панели
  * Версия: 5 — редизайн (синяя палитра, увеличенный UI, Dashboard поглощён Stats)
  *
  * Ответственность:
@@ -155,7 +149,7 @@ $cssVer = '5.6.8';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="assets/img/favicon.png">
-    <title>MineVPN Server Panel</title>
+    <title>VPN Server Panel</title>
 
     <link rel="stylesheet" href="assets/css/tokens.css?v=<?php echo $cssVer; ?>">
     <link rel="stylesheet" href="assets/css/base.css?v=<?php echo $cssVer; ?>">
@@ -170,10 +164,10 @@ $cssVer = '5.6.8';
     <aside class="sidebar">
 
         <!-- Брендинг / лого -->
-        <a href="cabinet.php" class="sidebar-brand" aria-label="MineVPN">
+        <a href="cabinet.php" class="sidebar-brand" aria-label="VPN">
             <img src="assets/img/logo.png" alt="">
             <div class="sidebar-brand-text">
-                <div class="sidebar-brand-name">MineVPN</div>
+                <div class="sidebar-brand-name">VPN</div>
                 <div class="sidebar-brand-sub">Server Panel</div>
             </div>
         </a>
@@ -246,18 +240,7 @@ $cssVer = '5.6.8';
             </a>
         </nav>
 
-        <!-- Футер: посылка на магазин MineVPN с иконкой. Brand-gradient text и tonal hover. -->
-        <div class="sidebar-footer">
-            <a href="https://minevpn.net/" target="_blank" rel="noopener noreferrer" class="sidebar-footer-link">
-                <svg class="sidebar-footer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
-                </svg>
-                <span class="sidebar-footer-text">minevpn.net</span>
-                <svg class="sidebar-footer-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
-                </svg>
-            </a>
-        </div>
+        <!-- Футер: посылка на магазин VPN с иконкой. Brand-gradient text и tonal hover. -->
     </aside>
 
     <!-- ════════════════════ Основной контент ════════════════════ -->
