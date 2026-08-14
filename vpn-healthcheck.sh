@@ -1,17 +1,11 @@
 #!/bin/bash
 #
-# ███╗   ███╗██╗███╗   ██╗███████╗██╗   ██╗██████╗ ███╗   ██╗
-# ████╗ ████║██║████╗  ██║██╔════╝██║   ██║██╔══██╗████╗  ██║
-# ██╔████╔██║██║██╔██╗ ██║█████╗  ██║   ██║██████╔╝██╔██╗ ██║
-# ██║╚██╔╝██║██║██║╚██╗██║██╔══╝  ╚██╗ ██╔╝██╔═══╝ ██║╚██╗██║
-# ██║ ╚═╝ ██║██║██║ ╚████║███████╗ ╚████╔╝ ██║     ██║ ╚████║
-# ╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚══════╝  ╚═══╝  ╚═╝     ╚═╝  ╚═══╝
 # ══════════════════════════════════════════════════════════════════
 #       V P N   H E A L T H C H E C K   D A E M O N   F I L E
 # ══════════════════════════════════════════════════════════════════
 #
 # @category    VPN Subsystem
-# @package     MineVPN\Server
+# @package     VPN\Server
 # @version     5.0.0
 # [WARNING]
 # This source code is strictly proprietary and confidential.
@@ -20,7 +14,7 @@
 # @copyright   2026 MineVPN Systems. All rights reserved.
 # ══════════════════════════════════════════════════════════════════
 #
-# MineVPN Server — VPN Health Check / Daemon мониторинга VPN-туннелей
+# VPN Server — VPN Health Check / Daemon мониторинга VPN-туннелей
 #
 # Работает как long-running сервис под systemd (Type=simple, Restart=always).
 # Главный цикл main_loop() крутится каждые 5с и проверяет состояние VPN.
