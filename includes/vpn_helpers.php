@@ -1,24 +1,18 @@
 <?php
 /**
- * ███╗   ███╗██╗███╗   ██╗███████╗██╗   ██╗██████╗ ███╗   ██╗
- * ████╗ ████║██║████╗  ██║██╔════╝██║   ██║██╔══██╗████╗  ██║
- * ██╔████╔██║██║██╔██╗ ██║█████╗  ██║   ██║██████╔╝██╔██╗ ██║
- * ██║╚██╔╝██║██║██║╚██╗██║██╔══╝  ╚██╗ ██╔╝██╔═══╝ ██║╚██╗██║
- * ██║ ╚═╝ ██║██║██║ ╚████║███████╗ ╚████╔╝ ██║     ██║ ╚████║
- * ╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚══════╝  ╚═══╝  ╚═╝     ╚═╝  ╚═══╝
  * ══════════════════════════════════════════════════════════════════
  *                V P N   H E L P E R S   F I L E
  * ══════════════════════════════════════════════════════════════════
  * * @category    VPN Subsystem
- * * @package     MineVPN\Server
+ * * @package     VPN\Server
  * * @version     5.0.0
  * * [WARNING] 
  * This source code is strictly proprietary and confidential. 
  * Unauthorized reproduction, distribution, or decompilation 
  * is strictly prohibited and heavily monitored.
- * * @copyright   2026 MineVPN Systems. All rights reserved.
+ * * @copyright   2026 VPN Systems. All rights reserved.
  *
- * MineVPN Server — VPN Helpers / Shared library для VPN-операций
+ * VPN Server — VPN Helpers / Shared library для VPN-операций
  *
  * Общие функции для всех файлов, которым нужны VPN примитивы. Не содержит HTTP логики —
  * только чистые helpers: чтение/запись метаданных, state machine, парсинг конфигов,
