@@ -888,16 +888,6 @@ curl -O https://raw.githubusercontent.com/MineVPN/VPN/main/diagnostic.sh && sudo
 
 ---
 
-## Связанные репозитории
-
-| Репозиторий | Что |
-|---|---|
-| [MineVPN/VPN](https://github.com/MineVPN/VPN) | **Установщик** — bash-скрипт, ставит ОС-пакеты и клонирует этот репо |
-| [MineVPN/WebVPNCabinet](https://github.com/MineVPN/WebVPNCabinet) | **Этот репо** — код панели |
-| [MineVPN/VPNServerPanel-v4-old](https://github.com/MineVPN/VPNServerPanel-v4-old) | Архив v4 (не поддерживается) |
-
----
-
 ## Поддержка и контакты
 - 🐛 Issues — в этом репозитории на GitHub
 
