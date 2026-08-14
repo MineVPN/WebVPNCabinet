@@ -1,24 +1,18 @@
 <?php
 /**
- * ███╗   ███╗██╗███╗   ██╗███████╗██╗   ██╗██████╗ ███╗   ██╗
- * ████╗ ████║██║████╗  ██║██╔════╝██║   ██║██╔══██╗████╗  ██║
- * ██╔████╔██║██║██╔██╗ ██║█████╗  ██║   ██║██████╔╝██╔██╗ ██║
- * ██║╚██╔╝██║██║██║╚██╗██║██╔══╝  ╚██╗ ██╔╝██╔═══╝ ██║╚██╗██║
- * ██║ ╚═╝ ██║██║██║ ╚████║███████╗ ╚████╔╝ ██║     ██║ ╚████║
- * ╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚══════╝  ╚═══╝  ╚═╝     ╚═╝  ╚═══╝
  * ══════════════════════════════════════════════════════════════════
  *                 A B O U T  P A G E   F I L E
  * ══════════════════════════════════════════════════════════════════
  * * @category    VPN Subsystem
- * * @package     MineVPN\Server
+ * * @package     VPN\Server
  * * @version     5.0.0
  * * [WARNING] 
  * This source code is strictly proprietary and confidential. 
  * Unauthorized reproduction, distribution, or decompilation 
  * is strictly prohibited and heavily monitored.
- * * @copyright   2026 MineVPN Systems. All rights reserved.
+ * * @copyright   2026 VPN Systems. All rights reserved.
  *
- * MineVPN Server — About / Страница «О продукте»
+ * VPN Server — About / Страница «О продукте»
  *
  * Multi-card layout: hero (logo+title+tagline) → описание → 6 features 3×2 grid → CTA → copyright.
  * Без форм, JS, AJAX — только презентация. Использует глобальные стили + inline page-specific.
@@ -28,8 +22,6 @@
  *   2. .about-info  — карточка с 3 параграфами описания (что это, для кого, технологии)
  *   3. .about-features — 3×2 grid из 6 feature-cards (Kill Switch, Резерв, Мониторинг, Терминал, VOIP, HC)
  *      каждая card имеет цветную иконку + заголовок + описание
- *   4. .about-cta   — CTA-карточка с brand-gradient фоном и Telegram-кнопкой (@minevpn_admin)
- *   5. footer       — copyright + minevpn.net
  *
  * Источники данных:
  *   • /var/www/version — номер версии (валидация regex /^\d+$/, fallback "N/A")
@@ -40,8 +32,6 @@
  *   • assets/img/logo.png — логотип
  *
  * Внешние ссылки (target="_blank" rel="noopener noreferrer"):
- *   • https://minevpn.net          — сайт проекта
- *   • https://t.me/minevpn_admin   — Telegram для контакта (установка / заказ серверов)
  */
 $version_file = '/var/www/version';
 $product_version = 'N/A';
@@ -249,10 +239,10 @@ if (file_exists($version_file) && is_readable($version_file)) {
 
     <!-- ════════════ 1. Hero — compact horizontal ════════════ -->
     <div class="card about-hero">
-        <img src="assets/img/logo.png" alt="MineVPN" class="about-hero-logo">
+        <img src="assets/img/logo.png" alt="VPN" class="about-hero-logo">
         <div class="about-hero-text">
             <div class="about-hero-title-row">
-                <h1 class="about-hero-title">MineVPN Server</h1>
+                <h1 class="about-hero-title">VPN Server</h1>
                 <span class="badge badge--emerald"><?php echo htmlspecialchars($product_version); ?></span>
             </div>
             <p class="about-hero-tagline">
@@ -266,7 +256,7 @@ if (file_exists($version_file) && is_readable($version_file)) {
     <div class="card about-info">
         <div class="about-info-title">Описание</div>
         <p>
-            <strong>MineVPN Server</strong> — это программа с веб-интерфейсом, которая превращает обычный компьютер
+            <strong>VPN Server</strong> — это программа с веб-интерфейсом, которая превращает обычный компьютер
             на Ubuntu в «входную дверь в интернет» для всей вашей локальной сети. Все другие устройства —
             компьютеры, телефоны, IP-камеры, принтеры, IP-телефоны — выходят в интернет через этот сервер,
             а он — через защищённый VPN-туннель. В результате ни одно из ваших устройств не раскрывает
@@ -356,26 +346,6 @@ if (file_exists($version_file) && is_readable($version_file)) {
 
     </div>
 
-    <!-- ════════════ 4. CTA — Telegram contact ════════════ -->
-    <div class="about-cta">
-        <div class="about-cta-text">
-            <div class="about-cta-title">Установка, настройка или заказ нового сервера</div>
-            <div class="about-cta-subtitle">
-                Поможем настроить новый сервер, починим существующий или подберём подходящее оборудование
-            </div>
-        </div>
-        <a href="https://t.me/minevpn_admin" target="_blank" rel="noopener noreferrer" class="about-tg-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.16.16-.295.295-.605.295l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.643.135-.953l11.566-4.458c.538-.196 1.006.128.832.941z"/>
-            </svg>
-            @minevpn_admin
-        </a>
-    </div>
 
-    <!-- ════════════ 5. Footer ════════════ -->
-    <div class="about-footer">
-        &copy; <?php echo date('Y'); ?> MineVPN Systems &middot;
-        <a href="https://minevpn.net" target="_blank" rel="noopener noreferrer">minevpn.net</a>
-    </div>
 
 </div>
