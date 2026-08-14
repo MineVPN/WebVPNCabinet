@@ -1,22 +1,16 @@
 <?php
 /**
- * ███╗   ███╗██╗███╗   ██╗███████╗██╗   ██╗██████╗ ███╗   ██╗
- * ████╗ ████║██║████╗  ██║██╔════╝██║   ██║██╔══██╗████╗  ██║
- * ██╔████╔██║██║██╔██╗ ██║█████╗  ██║   ██║██████╔╝██╔██╗ ██║
- * ██║╚██╔╝██║██║██║╚██╗██║██╔══╝  ╚██╗ ██╔╝██╔═══╝ ██║╚██╗██║
- * ██║ ╚═╝ ██║██║██║ ╚████║███████╗ ╚████╔╝ ██║     ██║ ╚████║
- * ╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚══════╝  ╚═══╝  ╚═╝     ╚═╝  ╚═══╝
  * ══════════════════════════════════════════════════════════════════
  *                       I N D E X   F I L E
  * ══════════════════════════════════════════════════════════════════
  * * @category    VPN Subsystem
- * * @package     MineVPN\Server
+ * * @package     VPN\Server
  * * @version     5.0.0
  * * [WARNING] 
  * This source code is strictly proprietary and confidential. 
  * Unauthorized reproduction, distribution, or decompilation 
  * is strictly prohibited and heavily monitored.
- * * @copyright   2026 MineVPN Systems. All rights reserved.
+ * * @copyright   2026 VPN Systems. All rights reserved.
  *
  * MineVPN Server — Router / Точка входа
  *
