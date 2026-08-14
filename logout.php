@@ -1,24 +1,18 @@
 <?php
 /**
- * ███╗   ███╗██╗███╗   ██╗███████╗██╗   ██╗██████╗ ███╗   ██╗
- * ████╗ ████║██║████╗  ██║██╔════╝██║   ██║██╔══██╗████╗  ██║
- * ██╔████╔██║██║██╔██╗ ██║█████╗  ██║   ██║██████╔╝██╔██╗ ██║
- * ██║╚██╔╝██║██║██║╚██╗██║██╔══╝  ╚██╗ ██╔╝██╔═══╝ ██║╚██╗██║
- * ██║ ╚═╝ ██║██║██║ ╚████║███████╗ ╚████╔╝ ██║     ██║ ╚████║
- * ╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚══════╝  ╚═══╝  ╚═╝     ╚═╝  ╚═══╝
  * ══════════════════════════════════════════════════════════════════
  *                      L O G O U T   F I L E
  * ══════════════════════════════════════════════════════════════════
  * * @category    VPN Subsystem
- * * @package     MineVPN\Server
+ * * @package     VPN\Server
  * * @version     5.0.0
  * * [WARNING] 
  * This source code is strictly proprietary and confidential. 
  * Unauthorized reproduction, distribution, or decompilation 
  * is strictly prohibited and heavily monitored.
- * * @copyright   2026 MineVPN Systems. All rights reserved.
+ * * @copyright   2026 VPN Systems. All rights reserved.
  *
- * MineVPN Server — Logout / Завершение сессии
+ * VPN Server — Logout / Завершение сессии
  *
  * Уничтожает сессию и удаляет cookie PHPSESSID, редиректит на login.php.
  *
