@@ -985,10 +985,6 @@ curl -O https://raw.githubusercontent.com/MineVPN/VPN/main/diagnostic.sh && sudo
 ---
 
 ## Поддержка и контакты
-
-- 🌐 [minevpn.net](https://minevpn.net) — сайт проекта
-- 🤖 [@MineVpn_Bot](https://t.me/MineVpn_Bot) — Telegram-бот (купить VPN-конфиг для тестирования)
-- 👤 [@minevpn_support](https://t.me/minevpn_support) — поддержка
 - 🐛 Issues — в этом репозитории на GitHub
 
 ---
