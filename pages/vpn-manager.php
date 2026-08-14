@@ -1,24 +1,18 @@
 <?php
 /**
- * ███╗   ███╗██╗███╗   ██╗███████╗██╗   ██╗██████╗ ███╗   ██╗
- * ████╗ ████║██║████╗  ██║██╔════╝██║   ██║██╔══██╗████╗  ██║
- * ██╔████╔██║██║██╔██╗ ██║█████╗  ██║   ██║██████╔╝██╔██╗ ██║
- * ██║╚██╔╝██║██║██║╚██╗██║██╔══╝  ╚██╗ ██╔╝██╔═══╝ ██║╚██╗██║
- * ██║ ╚═╝ ██║██║██║ ╚████║███████╗ ╚████╔╝ ██║     ██║ ╚████║
- * ╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚══════╝  ╚═══╝  ╚═╝     ╚═╝  ╚═══╝
  * ══════════════════════════════════════════════════════════════════
  *             V P N   M A N A G E R   P A G E   F I L E
  * ══════════════════════════════════════════════════════════════════
  * * @category    VPN Subsystem
- * * @package     MineVPN\Server
+ * * @package     VPN\Server
  * * @version     5.0.0
  * * [WARNING] 
  * This source code is strictly proprietary and confidential. 
  * Unauthorized reproduction, distribution, or decompilation 
  * is strictly prohibited and heavily monitored.
- * * @copyright   2026 MineVPN Systems. All rights reserved.
+ * * @copyright   2026 VPN Systems. All rights reserved.
  *
- * MineVPN Server — VPN Manager / Страница управления VPN-конфигами
+ * VPN Server — VPN Manager / Страница управления VPN-конфигами
  *
  * Главная рабочая страница панели. Отображает список конфигов, роли (primary/backup),
  * статус VPN, drag-drop сортировку по приоритету, upload форму. Рендерит HTML и подключает
@@ -34,7 +28,7 @@
  * Что рендерит:
  *   • Status card — соединение, имя конфига, тип, пинг, autorestart/failover баджи
  *   • Configs list — список с drag-drop sortable, роли, кнопки действий
- *   • Promo banner   — если 0 конфигов (CTA на minevpn.net + Telegram bot)
+ *   • Promo banner   — если 0 конфигов (CTA на  + Telegram bot)
  *   • Single-config warning — если ровно 1 конфиг и активен (CTA на бекап)
  *   • Upload form    — multipart форма для новых конфигов + "Купить" линк
  *
@@ -311,7 +305,6 @@ window.__flashMessage = {
                         останется без интернета. Стоит добавить запасной.
                     </div>
                 </div>
-                <a href="https://minevpn.net/" target="_blank" rel="noopener noreferrer" class="btn btn--brand btn--sm">Купить</a>
             </div>
         <?php endif; ?>
 
@@ -338,17 +331,6 @@ window.__flashMessage = {
 
                 <button type="submit" class="btn btn--primary btn--block">Загрузить</button>
             </form>
-
-            <!-- Ссылка на магазин — брендовый акцент под формой загрузки. Небольшой, вторичный. -->
-            <div class="upload-buy-hint">
-                <span class="text-xs text-muted">Нет своего конфига?</span>
-                <a href="https://minevpn.net/" target="_blank" rel="noopener noreferrer" class="vpn-buy-link">
-                    Купить в MineVPN
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
-                    </svg>
-                </a>
-            </div>
         </div>
     </div>
 
@@ -413,28 +395,6 @@ window.__flashMessage = {
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
                         </svg>
-                    </div>
-                    <div class="vpn-promo-banner-body">
-                        <div class="vpn-promo-banner-title">Готовые VPN-конфиги от MineVPN</div>
-                        <div class="vpn-promo-banner-text">
-                            Серверы во многих странах для вашей локальной сети.
-                            Купите → получите файл → загрузите в эту панель — и вся локальная сеть автоматически пойдёт через VPN.
-                            Поддерживаются WireGuard и OpenVPN.
-                        </div>
-                        <div class="vpn-promo-banner-actions">
-                            <a href="https://minevpn.net/" target="_blank" rel="noopener noreferrer" class="btn btn--brand btn--sm">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/>
-                                </svg>
-                                minevpn.net
-                            </a>
-                            <a href="https://t.me/MineVpn_Bot" target="_blank" rel="noopener noreferrer" class="btn btn--ghost btn--sm">
-                                <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
-                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.05-.2-.07-.06-.16-.04-.24-.02-.1.02-1.71 1.09-4.83 3.2-.46.31-.87.46-1.24.45-.41-.01-1.19-.23-1.78-.42-.71-.23-1.28-.35-1.23-.74.03-.2.3-.41.81-.62 3.18-1.39 5.31-2.31 6.39-2.75 3.04-1.27 3.67-1.49 4.08-1.49.09 0 .29.02.42.12.11.08.14.19.16.27-.01.06.01.24 0 .38z"/>
-                                </svg>
-                                Telegram бот
-                            </a>
-                        </div>
                     </div>
                 </div>
             <?php else: ?>
