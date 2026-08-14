@@ -6,7 +6,7 @@
 #
 # @category    VPN Subsystem
 # @package     VPN\Server
-# @version     5.0.0
+# @version     6.0.0
 # [WARNING]
 # This source code is strictly proprietary and confidential.
 # Unauthorized reproduction, distribution, or decompilation
@@ -16,7 +16,7 @@
 #
 # VPN Server — Update / Скрипт последовательных миграций версий
 #
-# Выполняет миграции v0→v5 (каждая — свой блок if). При достижении целевой версии
+# Выполняет миграции v0→v6 (каждая — свой блок if). При достижении целевой версии
 # продолжает выполнять sanity-check блоки (права файлов, sync HC, установка PHP-расширений).
 #
 # Что делает по блокам:
@@ -26,6 +26,8 @@
 #   • v3→v4  — bug-fix релиз (перекрыт миграцией v5)
 #   • v4→v5  — VPN Manager (несколько конфигов + failover), Kill Switch, shellinabox,
 #             HC daemon, gzip + кеш assets, редизайн UI, /etc/minevpn.conf, VOIP оптимизации
+#   • v5→v6  — git safe.directory для $WEB_DIR (фикс "dubious ownership") + жёсткая
+#             синхронизация репозитория с origin/main (fetch + reset --hard + clean -df)
 #
 # Взаимодействует с:
 #   • Installer.sh (корень репо) — вызывает этот скрипт при опции 2 (deploy)
@@ -54,7 +56,7 @@
 # Устанавливает пакеты: php-yaml, php-mbstring, shellinabox (apt-get install).
 # ==================================================================
 
-SCRIPT_VERSION=5
+SCRIPT_VERSION=6
 VERSION_FILE="/var/www/version"
 SETTINGS_FILE="/var/www/settings"
 WEB_DIR="/var/www/html"
@@ -159,6 +161,21 @@ detect_interfaces() {
     echo -e "${CYAN}╚══════════════════════════════════════════╝${NC}"
     echo ""
 } >&3
+
+# ==============================================================================
+# GIT SAFE.DIRECTORY (выполняется всегда, до любого git-вызова)
+# ==============================================================================
+# git 2.35.2+ отказывается работать в репозитории, владелец которого не совпадает
+# с UID вызывающего: "detected dubious ownership in repository". $WEB_DIR принадлежит
+# www-data (recursive chown в миграции v5), скрипт выполняется от root — без этой
+# записи ЛЮБОЙ git-вызов ниже молча падает (git pull скрыт за 2>/dev/null || true).
+#
+# Проверяем через --get-all перед --add: иначе каждый запуск update.sh дописывал бы
+# дубль строки в /root/.gitconfig.
+if ! git config --global --get-all safe.directory 2>/dev/null | grep -qxF "$WEB_DIR"; then
+    git config --global --add safe.directory "$WEB_DIR"
+    log_info "git safe.directory: добавлен $WEB_DIR"
+fi
 
 # Обновление репозитория (пропускаем если уже сделали git в Installer.sh)
 if [ "${SKIP_GIT:-0}" = "1" ]; then
@@ -850,6 +867,47 @@ EOF
 fi
 
 # ==============================================================================
+# МИГРАЦИЯ v5 → v6: Git safe.directory + жёсткая синхронизация репозитория
+# ==============================================================================
+# Проблема которую чиним: на серверах v5 каталог $WEB_DIR принадлежит www-data,
+# а update.sh/cron выполняются от root. git 2.35.2+ в такой ситуации отказывается
+# работать ("detected dubious ownership"), из-за чего `git pull origin main` в этом
+# скрипте молча ничего не делал (ошибка глушилась через 2>/dev/null || true) —
+# сервер оставался на старом коде, но версия в /var/www/version записывалась новая.
+#
+# Второе: `git pull` спотыкается о локальные изменения (правки прав, ручные хотфиксы,
+# merge-конфликты). Поэтому переходим на жёсткую синхронизацию — источником истины
+# считаем origin/main, всё локальное отбрасываем.
+#
+# ВНИМАНИЕ: `git clean -df` удаляет НЕотслеживаемые файлы внутри $WEB_DIR.
+# Данные панели лежат вне $WEB_DIR (/var/www/version, /var/www/settings,
+# /var/www/vpn-configs, /var/log/minevpn) и не затрагиваются.
+if [ "$CURRENT_VERSION" -lt 6 ]; then
+    log_step "Миграция v6: Git safe.directory + жёсткая синхронизация репозитория..."
+
+    # 1) safe.directory — уже добавлен блоком выше, здесь только подтверждаем
+    if git config --global --get-all safe.directory 2>/dev/null | grep -qxF "$WEB_DIR"; then
+        log_info "git safe.directory: $WEB_DIR прописан"
+    else
+        git config --global --add safe.directory "$WEB_DIR"
+        log_info "git safe.directory: добавлен $WEB_DIR"
+    fi
+
+    # 2) Жёсткая синхронизация с origin/main
+    if cd "$WEB_DIR" 2>/dev/null && [ -d .git ]; then
+        if git fetch origin && git reset --hard origin/main && git clean -df; then
+            log_info "Репозиторий синхронизирован с origin/main ($(git rev-parse --short HEAD 2>/dev/null))"
+        else
+            log_warn "Не удалось синхронизировать репозиторий — проверьте $LOG_FILE"
+        fi
+    else
+        log_warn "$WEB_DIR не является git-репозиторием — синхронизация пропущена"
+    fi
+
+    log_info "Миграция v6 завершена"
+fi
+
+# ==============================================================================
 # МИГРАЦИЯ: vpn_history.json → events.log
 # ==============================================================================
 # v5 рефакторинг: HC daemon писал в JSON через PHP inline (медленно + сложно).
@@ -1147,10 +1205,17 @@ fi
 CRON_LAUNCHER="/usr/local/bin/minevpn-update.sh"
 LEGACY_LAUNCHER="/usr/local/bin/run-update.sh"
 
-# Якщо нема або не містить SKIP_GIT=1 (ознака канонічного вмісту) — переписуємо
-if [ ! -f "$CRON_LAUNCHER" ] || ! grep -qF "SKIP_GIT=1" "$CRON_LAUNCHER" 2>/dev/null; then
+# Якщо нема, не містить SKIP_GIT=1 (ознака канонічного вмісту) або не містить
+# safe.directory (додано у v6) — переписуємо.
+# Без safe.directory cron ходить в $WEB_DIR від root і git падає на "dubious ownership",
+# тому launcher має прописувати її сам — він виконується ДО update.sh.
+if [ ! -f "$CRON_LAUNCHER" ] || \
+   ! grep -qF "SKIP_GIT=1" "$CRON_LAUNCHER" 2>/dev/null || \
+   ! grep -qF "safe.directory" "$CRON_LAUNCHER" 2>/dev/null; then
     cat > "$CRON_LAUNCHER" << 'LAUNCHER_EOF'
 #!/bin/bash
+git config --global --get-all safe.directory 2>/dev/null | grep -qx '/var/www/html' || \
+    git config --global --add safe.directory /var/www/html
 cd /var/www/html/ || exit 1
 echo "[$(date)] Обновление MineVPN..."
 git fetch origin && git reset --hard origin/main && git clean -df
@@ -1158,7 +1223,7 @@ git fetch origin && git reset --hard origin/main && git clean -df
 echo "[$(date)] Готово"
 LAUNCHER_EOF
     chmod +x "$CRON_LAUNCHER"
-    log_info "Cron launcher оновлено: $CRON_LAUNCHER (додано SKIP_GIT=1)"
+    log_info "Cron launcher оновлено: $CRON_LAUNCHER (SKIP_GIT=1 + safe.directory)"
 fi
 
 # Видаляємо legacy run-update.sh якщо залишився
@@ -1222,13 +1287,9 @@ echo "$SCRIPT_VERSION" > "$VERSION_FILE"
     echo -e "${GREEN}║    Обновление завершено: v$CURRENT_VERSION → v$SCRIPT_VERSION         ║${NC}"
     echo -e "${GREEN}╚══════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "  ${CYAN}Что нового в v5:${NC}"
-    echo "    • VPN Manager — несколько конфигов с приоритетами, drag-drop, failover"
-    echo "    • Kill Switch — LAN трафик блокируется при падении VPN"
-    echo "    • Веб-терминал на базе shellinabox (/shell/)"
-    echo "    • Health Check daemon — пинг + автоперезапуск + failover"
-    echo "    • Синий UI, увеличенные размеры, стартовая страница — Обзор"
-    echo "    • gzip-сжатие ассетов (mod_deflate), кэш на 1 год"
-    echo "    • VOIP оптимизации — conntrack tuning, SIP ALG disabled, DHCP lease 72h"
+    echo -e "  ${CYAN}Что нового в v6:${NC}"
+    echo "    • git safe.directory для $WEB_DIR — исправлен 'dubious ownership'"
+    echo "    • Жёсткая синхронизация: git fetch + reset --hard origin/main + clean -df"
+    echo "    • Локальные правки в $WEB_DIR больше не блокируют обновление"
     echo ""
 } >&3
